@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Insights</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+  <style>
+    .title-bar {
+      -webkit-app-region: drag;
+    }
+    .no-drag {
+      -webkit-app-region: no-drag;
+    }
+  </style>
+</head>
+<body class="bg-base-300 min-h-screen text-base-content font-sans animate__animated animate__fadeIn">
+
+  <div class="w-full h-8 bg-base-100 flex justify-between items-center px-4 border-b border-white/5 title-bar">
+    <div class="text-xs opacity-50 font-semibold select-none">Secure Ledger Framework Terminal — Insights View</div>
+    <div class="flex gap-1 no-drag">
+      <button onclick="ipcRenderer.send('window-minimize')" class="btn btn-ghost btn-xs btn-square hover:bg-white/10 text-base-content/70">╌</button>
+      <button onclick="ipcRenderer.send('window-close')" class="btn btn-ghost btn-xs btn-square hover:bg-error/20 text-error">✕</button>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto p-6">
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary" id="customer-name-heading">
+          Customer Insights
+        </h1>
+        <p class="text-sm text-base-content/60 mt-1">Overall weight metrics calculated directly from parties.json registry.</p>
+      </div>
+      <button onclick="window.location.href='index.html'" class="btn btn-outline btn-sm gap-2">
+        ← Back to Terminal
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      
+      <div class="card bg-base-100 shadow-xl border border-amber-500/10">
+        <div class="card-body p-5">
+          <h2 class="card-title text-amber-500 font-bold flex items-center gap-2 text-sm uppercase tracking-wider">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Gold Weight Ledger
+          </h2>
+          <div class="grid grid-cols-2 gap-3 mt-2">
+            <div class="bg-base-200 p-4 rounded-xl border border-white/5">
+              <p class="text-[10px] uppercase font-bold tracking-wider opacity-40">Total Incoming</p>
+              <p class="text-2xl font-black text-success mt-0.5" id="gold-incoming">0.000 <span class="text-xs font-normal opacity-50">g</span></p>
+            </div>
+            <div class="bg-base-200 p-4 rounded-xl border border-white/5">
+              <p class="text-[10px] uppercase font-bold tracking-wider opacity-40">Total Outgoing</p>
+              <p class="text-2xl font-black text-error mt-0.5" id="gold-outgoing">0.000 <span class="text-xs font-normal opacity-50">g</span></p>
+            </div>
+          </div>
+          <div class="mt-3 flex justify-between items-center px-2 bg-base-200/50 p-3 rounded-lg border border-white/5">
+            <div>
+              <span class="text-xs opacity-40 block">Net Gold Weight:</span>
+              <span class="text-base font-bold font-mono" id="gold-net">0.000 g</span>
+            </div>
+            <div id="gold-status-msg" class="text-xs font-semibold max-w-xs text-right opacity-90">
+              Calculating adjustments...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow-xl border border-slate-400/10">
+        <div class="card-body p-5">
+          <h2 class="card-title text-slate-300 font-bold flex items-center gap-2 text-sm uppercase tracking-wider">
+            <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></span> Silver Weight Ledger
+          </h2>
+          <div class="grid grid-cols-2 gap-3 mt-2">
+            <div class="bg-base-200 p-4 rounded-xl border border-white/5">
+              <p class="text-[10px] uppercase font-bold tracking-wider opacity-40">Total Incoming</p>
+              <p class="text-2xl font-black text-success mt-0.5" id="silver-incoming">0.000 <span class="text-xs font-normal opacity-50">g</span></p>
+            </div>
+            <div class="bg-base-200 p-4 rounded-xl border border-white/5">
+              <p class="text-[10px] uppercase font-bold tracking-wider opacity-40">Total Outgoing</p>
+              <p class="text-2xl font-black text-error mt-0.5" id="silver-outgoing">0.000 <span class="text-xs font-normal opacity-50">g</span></p>
+            </div>
+          </div>
+          <div class="mt-3 flex justify-between items-center px-2 bg-base-200/50 p-3 rounded-lg border border-white/5">
+            <div>
+              <span class="text-xs opacity-40 block">Net Silver Weight:</span>
+              <span class="text-base font-bold font-mono" id="silver-net">0.000 g</span>
+            </div>
+            <div id="silver-status-msg" class="text-xs font-semibold max-w-xs text-right opacity-90">
+              Calculating adjustments...
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const fs = require('fs');
+    const path = require('path');
+
+    // Parse URL targets
+    const urlParams = new URLSearchParams(window.location.search);
+    const firstName = urlParams.get('firstName') || '';
+    const lastName = urlParams.get('lastName') || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    document.getElementById('customer-name-heading').innerText = `Insights Matrix: ${fullName}`;
+
+    function init() {
+      ipcRenderer.invoke("get-user-data-path").then((userDataPath) => {
+        const PARTIES_FILE_PATH = path.join(userDataPath, 'parties.json');
+        
+        if (!fs.existsSync(PARTIES_FILE_PATH)) {
+          showError("Notice: 'parties.json' registry path file missing.");
+          return;
+        }
+
+        let rawData = fs.readFileSync(PARTIES_FILE_PATH, 'utf-8');
+        let parsedData = JSON.parse(rawData || '[]');
+        let partiesArray = Array.isArray(parsedData) ? parsedData : Object.values(parsedData);
+
+        // Find match profile target object
+        const currentParty = partiesArray.find(entry => {
+          if (!entry || typeof entry !== 'object') return false;
+          const matchFirst = entry.firstName || '';
+          const matchLast = entry.lastName || '';
+          return matchFirst.toLowerCase().trim() === firstName.toLowerCase().trim() &&
+                 matchLast.toLowerCase().trim() === lastName.toLowerCase().trim();
+        });
+
+        if (!currentParty) {
+          showError("No matching records found for this user name.");
+          return;
+        }
+
+        // Target matching custom key grids structures
+        const goldInGrid = currentParty.metricsGridData_Gold_Incoming || [];
+        const goldOutGrid = currentParty.metricsGridData_Gold_Outgoing || [];
+        const silverInGrid = currentParty.metricsGridData_Silver_Incoming || [];
+        const silverOutGrid = currentParty.metricsGridData_Silver_Outgoing || [];
+
+        const sumWeights = (gridArray) => gridArray.reduce((acc, row) => acc + parseFloat(row.weight || 0), 0);
+
+        let goldIn = sumWeights(goldInGrid);
+        let goldOut = sumWeights(goldOutGrid);
+        let silverIn = sumWeights(silverInGrid);
+        let silverOut = sumWeights(silverOutGrid);
+
+        const goldNet = goldIn - goldOut;
+        const silverNet = silverIn - silverOut;
+
+        // Render Raw Weights to Dashboard Elements
+        document.getElementById('gold-incoming').innerHTML = `${goldIn.toFixed(3)} <span class="text-xs font-normal opacity-50">g</span>`;
+        document.getElementById('gold-outgoing').innerHTML = `${goldOut.toFixed(3)} <span class="text-xs font-normal opacity-50">g</span>`;
+        document.getElementById('gold-net').innerText = `${goldNet >= 0 ? '+' : ''}${goldNet.toFixed(3)} g`;
+        document.getElementById('gold-net').className = "text-base font-bold font-mono " + (goldNet < 0 ? "text-error" : "text-success");
+
+        document.getElementById('silver-incoming').innerHTML = `${silverIn.toFixed(3)} <span class="text-xs font-normal opacity-50">g</span>`;
+        document.getElementById('silver-outgoing').innerHTML = `${silverOut.toFixed(3)} <span class="text-xs font-normal opacity-50">g</span>`;
+        document.getElementById('silver-net').innerText = `${silverNet >= 0 ? '+' : ''}${silverNet.toFixed(3)} g`;
+        document.getElementById('silver-net').className = "text-base font-bold font-mono " + (silverNet < 0 ? "text-error" : "text-success");
+
+        // DYNAMIC ADJUSTMENT MESSAGES FOR GOLD
+        const goldMsgEl = document.getElementById('gold-status-msg');
+        if (goldNet > 0) {
+          goldMsgEl.innerHTML = `<span class="text-success">need to give <span class="underline font-bold">${goldNet.toFixed(3)} gm</span> to ${fullName}.</span>`;
+        } else if (goldNet < 0) {
+          goldMsgEl.innerHTML = `<span class="text-error">need to borrow <span class="underline font-bold">${Math.abs(goldNet).toFixed(3)} gm</span> from ${fullName}.</span>`;
+        } else {
+          goldMsgEl.innerHTML = `<span class="text-base-content/50">Gold ledger perfectly balanced.</span>`;
+        }
+
+        // DYNAMIC ADJUSTMENT MESSAGES FOR SILVER
+        const silverMsgEl = document.getElementById('silver-status-msg');
+        if (silverNet > 0) {
+          silverMsgEl.innerHTML = `<span class="text-success">need to give <span class="underline font-bold">${silverNet.toFixed(3)} gm</span> to ${fullName}.</span>`;
+        } else if (silverNet < 0) {
+          silverMsgEl.innerHTML = `<span class="text-error">need to borrow <span class="underline font-bold">${Math.abs(silverNet).toFixed(3)} gm</span> from ${fullName}.</span>`;
+        } else {
+          silverMsgEl.innerHTML = `<span class="text-base-content/50">Silver ledger perfectly balanced.</span>`;
+        }
+
+      }).catch(err => {
+        showError("IPC Error: " + err.message);
+      });
+    }
+
+    function showError(msg) {
+      document.getElementById('gold-status-msg').innerText = "Error encountered.";
+      document.getElementById('silver-status-msg').innerText = "Error encountered.";
+      alert(msg);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>

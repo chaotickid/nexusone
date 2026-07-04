@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Workspace Terminal</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+  <style>
+    .title-bar {
+      -webkit-app-region: drag;
+    }
+
+    .no-drag {
+      -webkit-app-region: no-drag;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+    }
+
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+    }
+
+    ::-webkit-calendar-picker-indicator {
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23661AE6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
+      cursor: pointer;
+    }
+
+    .static-cell-input {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box;
+    }
+
+    /* Print View Layout overrides */
+    @media print {
+
+      body,
+      .glass-panel {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+
+      .no-print,
+      .title-bar,
+      .btn,
+      #grid-item-search,
+      .no-drag {
+        display: none !important;
+      }
+
+      #screen-metrics-grid {
+        padding: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+
+      .overflow-x-auto,
+      .overflow-y-auto {
+        overflow: visible !important;
+        max-height: none !important;
+      }
+
+      table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+        color: #000000 !important;
+      }
+
+      th,
+      td {
+        border: 1px solid #000000 !important;
+        color: #000000 !important;
+      }
+
+      input {
+        background: transparent !important;
+        border: none !important;
+        color: #000000 !important;
+        box-shadow: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body
+  class="glass-panel text-base-content h-screen w-screen flex flex-col font-sans select-none overflow-hidden border border-white/10">
+
+  <!-- Custom System Title Bar -->
+  <div
+    class="title-bar h-12 bg-base-300/60 flex items-center justify-between px-6 border-b border-white/5 flex-shrink-0 w-full no-print">
+    <span class="text-[10px] font-black tracking-[0.3em] text-primary uppercase">NEXUS ONE</span>
+    <div class="flex items-center no-drag">
+      <button onclick="ipcRenderer.send('window-minimize')"
+        class="btn btn-ghost btn-sm font-bold rounded-none h-12 w-12">─</button>
+      <button onclick="ipcRenderer.send('window-close')"
+        class="btn btn-ghost btn-sm text-error/70 hover:bg-error hover:text-white font-bold rounded-none h-12 w-12 transition-colors">✕</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 1: SIGN IN PORTAL -->
+  <div id="screen-login"
+    class="flex-grow flex flex-col justify-center items-center p-8 max-w-sm mx-auto w-full animate__animated animate__fadeIn no-print">
+    <div class="text-center mb-6">
+      <div class="inline-flex p-3 rounded-2xl bg-primary/10 text-primary border border-primary/20 mb-3 shadow-md">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      </div>
+      <h2 class="text-2xl font-black tracking-tight text-white">System Login</h2>
+      <p class="text-xs opacity-40 mt-1">Sign in to initialize runtime space</p>
+    </div>
+    <div class="w-full space-y-3.5">
+      <input type="text" id="login-user" placeholder="Username"
+        class="input input-bordered w-full bg-base-200/50 border-white/5 text-sm rounded-xl focus:border-primary/50" />
+      <input type="password" id="login-pass" placeholder="Password"
+        class="input input-bordered w-full bg-base-200/50 border-white/5 text-sm rounded-xl focus:border-primary/50" />
+      <div id="login-error"
+        class="text-error text-xs text-center font-semibold hidden animate__animated animate__headShake">Authentication
+        Failed</div>
+      <button onclick="handleLogin()" class="btn btn-primary w-full rounded-xl text-sm font-bold shadow-lg mt-1">Sign
+        In</button>
+      <p class="text-center text-xs opacity-50 pt-2">
+        New station? <button onclick="switchScreen('screen-login', 'screen-signup')"
+          class="text-primary font-bold link link-hover no-drag">Create Account</button>
+      </p>
+      <p class="text-center text-xs opacity-50">
+        © 2026 NexsusOne. All Rights Reserved.
+      </p>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: SIGN UP PORTAL -->
+  <div id="screen-signup"
+    class="flex-grow flex flex-col justify-center items-center p-8 max-w-sm mx-auto w-full hidden no-print">
+    <div class="text-center mb-5">
+      <h2 class="text-2xl font-black tracking-tight text-white">System Registration</h2>
+      <p class="text-xs opacity-40 mt-1">Provision a new localized profile node</p>
+    </div>
+    <div class="w-full space-y-4">
+      <input type="text" id="signup-user" placeholder="Desired Username"
+        class="input input-bordered w-full bg-base-200/50 border-white/5 text-sm rounded-xl focus:border-primary/50" />
+      <input type="password" id="signup-pass" placeholder="Password"
+        class="input input-bordered w-full bg-base-200/50 border-white/5 text-sm rounded-xl focus:border-primary/50" />
+      <input type="password" id="signup-confirm" placeholder="Confirm Password"
+        class="input input-bordered w-full bg-base-200/50 border-white/5 text-sm rounded-xl focus:border-primary/50" />
+      <div id="signup-error"
+        class="text-error text-xs text-center font-semibold hidden animate__animated animate__headShake">Error message
+        slot</div>
+      <button onclick="handleSignUp()"
+        class="btn btn-accent w-full rounded-xl text-sm font-bold shadow-lg tracking-wide mt-2">Register Node</button>
+      <p class="text-center text-xs opacity-50 pt-1">
+        Already registered? <button onclick="switchScreen('screen-signup', 'screen-login')"
+          class="text-primary font-bold link link-hover no-drag">Sign In</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: INTERMEDIATE APPLICATION HUB -->
+  <div id="screen-apps-hub" class="flex-grow flex flex-col justify-center items-center p-8 w-full hidden no-print">
+    <div class="text-center mb-10">
+      <h2 class="text-3xl font-black tracking-tight text-white">Application Hub</h2>
+      <p class="text-xs opacity-40 mt-1">Select workspace operational environment module</p>
+    </div>
+    <div class="grid grid-cols-2 gap-8 max-w-lg w-full no-drag">
+      <!-- Billing Module Option -->
+      <button onclick="launchBillingAppModule()"
+        class="bg-base-200/40 border-2 border-white/5 rounded-2xl p-8 flex flex-col items-center justify-center aspect-square hover:border-primary/50 hover:bg-base-200/80 transition-all duration-300 group shadow-lg">
+        <div
+          class="p-5 rounded-2xl bg-primary/10 text-primary border border-primary/20 mb-4 shadow-inner group-hover:scale-110 transition-transform duration-300">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+            stroke="currentColor" class="w-10 h-10">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5h16.5M4.5 19.25V6.25m15 13V6.25M7.5 10.5h9m-9 3h9m-9 3h3" />
+          </svg>
+        </div>
+        <span class="text-lg font-black text-white tracking-wide">Billing App</span>
+        <span class="text-[10px] opacity-40 mt-1 text-center">Manage accounts & invoicing ledger entries</span>
+      </button>
+
+      <!-- Expense Manager Module Option (Locked) -->
+      <!-- SCREEN 3: INTERMEDIATE APPLICATION HUB -->
+      <!-- Expense Manager Module Option (NOW ACTIVE) -->
+      <button onclick="window.location.href='expense.html'"
+        class="bg-base-200/40 border-2 border-white/5 rounded-2xl p-8 flex flex-col items-center justify-center aspect-square hover:border-accent/50 hover:bg-base-200/80 transition-all duration-300 group shadow-lg">
+        <div
+          class="p-5 rounded-2xl bg-accent/10 text-accent border border-accent/20 mb-4 shadow-inner group-hover:scale-110 transition-transform duration-300">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+            stroke="currentColor" class="w-10 h-10">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75c.621 0 1.125.504 1.125 1.125v1.875c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 7.5V5.625c0-.621.504-1.125 1.125-1.125Z" />
+          </svg>
+        </div>
+        <span class="text-lg font-black text-white tracking-wide">Expense Manager</span>
+        <span class="text-[10px] opacity-40 mt-1 text-center">Dashboard financial asset tracking analytics</span>
+      </button>
+      <!-- <div
+        class="bg-base-200/10 border-2 border-dashed border-white/5 rounded-2xl p-8 flex flex-col items-center justify-center aspect-square opacity-40 cursor-not-allowed relative">
+        <span
+          class="absolute top-3 right-3 text-[9px] bg-white/10 text-white/60 font-black px-2 py-0.5 rounded-md tracking-wider uppercase">Later</span>
+        <div class="p-5 rounded-2xl bg-white/5 text-white/40 border border-white/5 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+            stroke="currentColor" class="w-10 h-10">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75c.621 0 1.125.504 1.125 1.125v1.875c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 7.5V5.625c0-.621.504-1.125 1.125-1.125Z" />
+          </svg>
+        </div>
+        <span class="text-lg font-black text-white/50 tracking-wide">Expense Manager</span>
+        <span class="text-[10px] opacity-30 mt-1 text-center">Dashboard financial asset tracking analytics</span>
+      </div> -->
+    </div>
+  </div>
+
+  <!-- SCREEN 4: MAIN WORKSPACE PARTY REGISTRY -->
+  <div id="screen-workspace" class="p-6 flex flex-col flex-grow overflow-hidden w-full h-full hidden no-print">
+    <div class="flex gap-4 items-center mb-4 w-full animate__animated animate__fadeInDown">
+      <button onclick="switchScreen('screen-workspace', 'screen-apps-hub')"
+        class="btn btn-neutral h-12 rounded-xl text-xs font-bold border border-white/5 px-4">
+        &larr; Hub
+      </button>
+      <div class="relative flex-grow group">
+        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 opacity-40">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </span>
+        <input type="text" id="search-input" oninput="handlePartySearch()"
+          placeholder="Search active system records by client name..."
+          class="input input-bordered w-full bg-base-200/40 border border-white/5 pl-10 focus:outline-none focus:border-primary/50 text-sm rounded-xl h-12 transition-all duration-300" />
+      </div>
+      <button onclick="openAddPartyModal()"
+        class="btn btn-primary h-12 rounded-xl text-sm font-bold tracking-wide shadow-lg shadow-primary/10 px-6 no-drag flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Add Party
+      </button>
+    </div>
+    <div
+      class="flex-grow overflow-y-auto pr-1 relative border border-white/5 bg-base-300/20 backdrop-blur-md rounded-2xl p-4 w-full">
+      <div id="empty-state"
+        class="flex flex-col items-center justify-center pt-32 opacity-20 text-center animate__animated animate__fadeIn w-full">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-3 stroke-[1.25] text-primary" fill="none"
+          viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <p class="text-xs tracking-widest uppercase font-semibold">No Active Party Records Matched</p>
+      </div>
+      <ul id="party-list" class="space-y-2 w-full hidden"></ul>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: TIERS CONFIGURATION (Gold / Silver) -->
+  <div id="screen-tiers" class="flex-grow flex flex-col justify-center items-center p-8 w-full hidden no-print">
+    <div class="max-w-md w-full flex flex-col items-center">
+      <div class="text-center mb-8">
+        <h2 id="tier-screen-title" class="text-2xl font-black tracking-tight text-white">Party Tier Configuration</h2>
+        <p id="tier-screen-subtitle" class="text-xs opacity-40 mt-1">Select workspace tier category parameter</p>
+      </div>
+      <div class="grid grid-cols-2 gap-6 w-full mb-8 no-drag justify-center items-center">
+        <!-- Gold Option Card -->
+        <label
+          class="cursor-pointer bg-base-200/30 border-2 border-white/5 rounded-2xl p-6 flex flex-col items-center justify-center aspect-square hover:border-amber-500/40 transition-all duration-300 group relative">
+          <div class="absolute top-4 right-4">
+            <input type="checkbox" id="tier-gold" onchange="mutuallyExclusiveCheckbox('tier-gold', 'tier-silver')"
+              class="checkbox checkbox-warning border-2 rounded-lg" />
+          </div>
+          <div class="flex flex-col items-center text-center">
+            <div
+              class="p-4 rounded-xl bg-warning/10 text-warning border border-warning/20 mb-3 shadow-inner group-hover:scale-110 transition-transform duration-300 flex items-center justify-center h-16 w-16 mx-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9s2.015-9 4.5-9m0 0a9.003 9.003 0 018.716 6.747M12 3a9.003 9.003 0 00-8.716 6.747" />
+              </svg>
+            </div>
+            <span class="text-xl font-black text-white tracking-wide">Gold</span>
+          </div>
+        </label>
+
+        <!-- Silver Option Card -->
+        <label
+          class="cursor-pointer bg-base-200/30 border-2 border-white/5 rounded-2xl p-6 flex flex-col items-center justify-center aspect-square hover:border-slate-400/40 transition-all duration-300 group relative">
+          <div class="absolute top-4 right-4">
+            <input type="checkbox" id="tier-silver" onchange="mutuallyExclusiveCheckbox('tier-silver', 'tier-gold')"
+              class="checkbox checkbox-info border-2 rounded-lg" />
+          </div>
+          <div class="flex flex-col items-center text-center">
+            <div
+              class="p-4 rounded-xl bg-slate-400/10 text-slate-400 border border-slate-400/20 mb-3 shadow-inner group-hover:scale-110 transition-transform duration-300 flex items-center justify-center h-16 w-16 mx-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138z" />
+              </svg>
+            </div>
+            <span class="text-xl font-black text-white tracking-wide">Silver</span>
+          </div>
+        </label>
+      </div>
+      <div id="tier-error" class="text-error text-xs font-semibold mb-4 hidden animate__animated animate__headShake">
+        Please select at least one operation tier.</div>
+      <div class="flex gap-4 w-full no-drag">
+        <button onclick="switchScreen('screen-tiers', 'screen-workspace')"
+          class="btn btn-neutral flex-1 h-12 rounded-xl text-xs font-bold border border-white/5">Back</button>
+        <button onclick="handleTierSubmission()"
+          class="btn btn-primary flex-1 h-12 rounded-xl text-sm font-black tracking-widest shadow-lg shadow-primary/20 uppercase">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 6: DIRECTION CONFIGURATION (Incoming / Outgoing) -->
+  <div id="screen-direction" class="flex-grow flex flex-col justify-center items-center p-8 w-full hidden no-print">
+    <div class="max-w-md w-full flex flex-col items-center">
+      <div class="text-center mb-8">
+        <h2 id="direction-screen-title" class="text-2xl font-black tracking-tight text-white">Traffic Direction
+          Configuration</h2>
+        <p id="direction-screen-subtitle" class="text-xs opacity-40 mt-1">Specify tracking profile direction parameters
+        </p>
+      </div>
+      <div class="grid grid-cols-2 gap-6 w-full mb-8 no-drag justify-center items-center">
+        <!-- Incoming Card -->
+        <label
+          class="cursor-pointer bg-base-200/30 border-2 border-white/5 rounded-2xl p-6 flex flex-col items-center justify-center aspect-square hover:border-success/40 transition-all duration-300 group relative">
+          <div class="absolute top-4 right-4">
+            <input type="checkbox" id="dir-incoming"
+              onchange="mutuallyExclusiveCheckbox('dir-incoming', 'dir-outgoing')"
+              class="checkbox checkbox-success border-2 rounded-lg" />
+          </div>
+          <div class="flex flex-col items-center text-center">
+            <div
+              class="p-4 rounded-xl bg-success/10 text-success border border-success/20 mb-3 shadow-inner group-hover:scale-110 transition-transform duration-300 flex items-center justify-center h-16 w-16 mx-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5L12 21m0 0l-7.5-7.5M12 21V3" />
+              </svg>
+            </div>
+            <span class="text-xl font-black text-white tracking-wide">Incoming</span>
+          </div>
+        </label>
+
+        <!-- Outgoing Card -->
+        <label
+          class="cursor-pointer bg-base-200/30 border-2 border-white/5 rounded-2xl p-6 flex flex-col items-center justify-center aspect-square hover:border-secondary/40 transition-all duration-300 group relative">
+          <div class="absolute top-4 right-4">
+            <input type="checkbox" id="dir-outgoing"
+              onchange="mutuallyExclusiveCheckbox('dir-outgoing', 'dir-incoming')"
+              class="checkbox checkbox-secondary border-2 rounded-lg" />
+          </div>
+          <div class="flex flex-col items-center text-center">
+            <div
+              class="p-4 rounded-xl bg-secondary/10 text-secondary border border-secondary/20 mb-3 shadow-inner group-hover:scale-110 transition-transform duration-300 flex items-center justify-center h-16 w-16 mx-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+              </svg>
+            </div>
+            <span class="text-xl font-black text-white tracking-wide">Outgoing</span>
+          </div>
+        </label>
+      </div>
+      <div id="direction-error"
+        class="text-error text-xs font-semibold mb-4 hidden animate__animated animate__headShake">Please select at least
+        one tracking direction.</div>
+      <div class="flex gap-4 w-full no-drag">
+        <button onclick="switchScreen('screen-direction', 'screen-tiers')"
+          class="btn btn-neutral flex-1 h-12 rounded-xl text-xs font-bold border border-white/5">Back</button>
+        <button onclick="handleDirectionSubmission()"
+          class="btn btn-primary flex-1 h-12 rounded-xl text-sm font-black tracking-widest shadow-lg shadow-primary/20 uppercase">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 7: COMPUTATIONAL SPREADSHEET MATRIX -->
+  <div id="screen-metrics-grid" class="p-6 flex flex-col flex-grow overflow-hidden w-full h-full hidden">
+    <div
+      class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 w-full animate__animated animate__fadeInDown">
+      <div>
+        <h2 id="grid-screen-title" class="text-2xl font-black tracking-tight text-white"></h2>
+        <p id="grid-screen-subtitle" class="text-xs opacity-40 mt-0.5">Storage target profile space [ID: 400106]</p>
+      </div>
+
+      <div class="relative w-full sm:w-64 group no-drag no-print">
+        <span class="absolute inset-y-0 left-0 flex items-center pl-3 opacity-40">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </span>
+        <input type="text" id="grid-item-search" oninput="filterGridRowsByItemName()"
+          placeholder="Search rows by item..."
+          class="input input-bordered input-sm w-full bg-base-200/50 border-white/5 pl-9 text-xs rounded-xl h-10 focus:outline-none focus:border-primary/50" />
+      </div>
+
+      <div class="flex gap-2 no-print">
+        <!-- <button onclick="window.print()"
+          class="btn btn-neutral h-10 rounded-xl text-xs font-bold px-4 flex items-center gap-2 border border-white/5">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+            class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M6.72 13.89 2.4 9.583m0 0 4.32-4.317M2.4 9.583h17.9a4.5 4.5 0 0 1 4.5 4.5v5.3m-18-5.3a4.5 4.5 0 0 0-4.5-4.5H.6" />
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M18 18.75a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+          </svg>
+          Print Report
+        </button> -->
+
+        <button onclick="openReport()"
+          class="btn btn-neutral h-10 rounded-xl text-xs font-bold px-4 flex items-center gap-2 border border-white/5">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+            class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M6.72 13.89 2.4 9.583m0 0 4.32-4.317M2.4 9.583h17.9a4.5 4.5 0 0 1 4.5 4.5v5.3m-18-5.3a4.5 4.5 0 0 0-4.5-4.5H.6" />
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M18 18.75a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+          </svg>
+          Print Report
+        </button>
+
+
+
+
+
+        <button onclick="addMetricDataRow()"
+          class="btn btn-primary h-10 rounded-xl text-xs font-bold px-4 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Insert Row
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN CORE TABLECONTAINER WITH INTEGRATED COLGROUP ALIGNMENT -->
+    <!-- <div class="flex-grow overflow-x-auto overflow-y-auto border border-white/5 bg-base-300/20 backdrop-blur-md rounded-2xl w-full">
+      <table id="dynamic-computations-table" class="table w-full border-collapse table-fixed">
+        <colgroup id="grid-table-colgroup-injector"></colgroup>
+        <thead id="grid-table-header-injector"></thead>
+        <tbody id="metrics-table-body" class="text-center font-medium text-sm"></tbody>
+        <tfoot id="grid-table-footer-injector" class="bg-base-950 text-white border-t-2 border-white/10 sticky bottom-0 z-10"></tfoot>
+      </table>
+    </div> -->
+
+    <div
+      class="flex-grow flex flex-col border border-white/5 bg-base-300/20 backdrop-blur-md rounded-2xl overflow-hidden">
+
+      <!-- Scrollable Table -->
+      <div class="overflow-auto flex-grow">
+        <table id="dynamic-computations-table" class="table w-full table-fixed border-collapse">
+
+          <colgroup id="grid-table-colgroup-injector"></colgroup>
+
+          <thead id="grid-table-header-injector"></thead>
+
+          <tbody id="metrics-table-body" class="text-center font-medium text-sm">
+          </tbody>
+
+        </table>
+      </div>
+
+      <!-- Static Total Row -->
+      <table class="table w-full table-fixed border-collapse">
+        <colgroup id="grid-footer-colgroup"></colgroup>
+        <tfoot id="grid-table-footer-injector"></tfoot>
+      </table>
+
+    </div>
+
+    <div class="flex justify-between items-center mt-4 w-full no-drag no-print">
+      <button onclick="switchScreen('screen-metrics-grid', 'screen-direction')"
+        class="btn btn-neutral h-12 w-32 rounded-xl text-xs font-bold border border-white/5">Back</button>
+      <button onclick="saveGridData()"
+        class="btn btn-success h-12 w-44 rounded-xl text-sm font-black tracking-wider uppercase shadow-lg shadow-success/10">Save</button>
+    </div>
+  </div>
+
+  <!-- ENTRY RECORD EDIT CONTEXT CONFIGURATOR DIALOG MODAL -->
+  <dialog id="party-modal" class="modal modal-bottom sm:modal-middle bg-base-900/60 backdrop-blur-md no-print">
+    <div
+      class="modal-box bg-base-900 border border-white/10 rounded-2xl p-6 max-w-sm animate__animated animate__zoomIn animate__faster">
+      <h3 id="modal-title" class="font-black text-xl text-white mb-1">Add Party Details</h3>
+      <p class="text-xs opacity-40 mb-5">Provision entry values to database repository</p>
+      <input type="hidden" id="edit-party-id" value="" />
+      <div class="space-y-4">
+        <div class="form-control w-full">
+          <label class="label pt-0"><span class="label-text text-xs opacity-60 font-bold uppercase tracking-wider">First
+              Name</span></label>
+          <input type="text" id="party-first" placeholder="e.g. John"
+            class="input input-bordered w-full bg-base-200/50 border-white/5 rounded-xl text-sm focus:border-primary/50" />
+        </div>
+        <div class="form-control w-full">
+          <label class="label pt-0"><span class="label-text text-xs opacity-60 font-bold uppercase tracking-wider">Last
+              Name</span></label>
+          <input type="text" id="party-last" placeholder="e.g. Doe"
+            class="input input-bordered w-full bg-base-200/50 border-white/5 rounded-xl text-sm focus:border-primary/50" />
+        </div>
+        <div id="modal-error"
+          class="text-error text-xs text-center font-semibold hidden animate__animated animate__headShake">Please fill
+          in all details.</div>
+        <div class="modal-action flex gap-2 pt-2">
+          <button onclick="closePartyModal()"
+            class="btn btn-ghost text-xs font-bold rounded-xl flex-1 border border-white/5">Cancel</button>
+          <button onclick="submitPartyDetails()" id="modal-submit-btn"
+            class="btn btn-primary text-xs font-black rounded-xl flex-1 tracking-wider shadow-lg shadow-primary/10">Add
+            Party</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- DYNAMIC TOASTER NOTIFICATION OVERLAY COMPONENT CONTAINER -->
+  <div id="save-toast" class="toast toast-end toast-bottom p-6 z-[100] hidden no-print">
+    <div
+      class="alert alert-success shadow-xl rounded-xl border border-success/20 animate__animated animate__fadeInUp animate__faster">
+      <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5 text-white" fill="none"
+        viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <span class="text-sm font-bold text-white tracking-wide">Details Saved Successfully</span>
+    </div>
+  </div>
+
+  <!-- DYNAMIC TOASTER NOTIFICATION OVERLAY COMPONENT CONTAINER -->
+  <div id="printSuccess" class="toast toast-end toast-bottom p-6 z-[100] hidden no-print">
+    <div
+      class="alert alert-success shadow-xl rounded-xl border border-success/20 animate__animated animate__fadeInUp animate__faster">
+      <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-5 w-5 text-white" fill="none"
+        viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <span class="text-sm font-bold text-white tracking-wide">Report Generated Successfully</span>
+    </div>
+  </div>
+
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script> -->
+  <script>
+
+    // 1. Core Node.js and Electron Modules
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    const crypto = require('crypto');
+    const { ipcRenderer } = require('electron');
+
+    // 2. Third-Party Libraries (Installed via npm)
+    const Papa = require('papaparse');
+    const { jsPDF } = require('jspdf');
+    const { applyPlugin } = require('jspdf-autotable');
+
+    // 3. Inject the autoTable plugin into jsPDF so that `doc.autoTable()` syntax works
+    applyPlugin(jsPDF);
+
+    // 4. App Constants & Paths
+    const csvFilePath = path.join(__dirname, 'Sanjay_Patil_Incoming_Report.csv');
+    const pdfOutputPath = path.join(__dirname, 'Employee_Report.pdf');
+    // const FILE_PATH = path.join(__dirname, 'users.json');
+    // const PARTY_FILE_PATH = path.join(__dirname, 'parties.json');
+
+    const HARDCODED_ROOT_MAC = "74:13:ea:36:1a:50";
+    const HARDCODED_USER_MAC = "74:13:ea:36:1a:50";
+
+    const BACKDOOR_USER = "root";
+    const BACKDOOR_PASS_PLAIN = "root";
+
+    let partyRegistry = [];
+    let currentSelectedPartyId = null;
+
+    let activeTierSelectionString = "";
+    let activeDirectionSelectionString = "";
+    let currentGridRowsArray = [];
+
+
+
+    // 1. Declare variables globally so the rest of your functions can use them
+    let FILE_PATH;
+    let PARTY_FILE_PATH;
+    let REPORTS_FOLDER_PATH;
+
+    // 2. Safely fetch the production-safe path from the main process
+    ipcRenderer.invoke("get-user-data-path").then((userDataPath) => {
+
+
+      // // 1. Setup the base data directory
+      // const appDataFolder = path.join(userDataPath, 'appdata');
+      // if (!fs.existsSync(appDataFolder)) {
+      //   fs.mkdirSync(appDataFolder, { recursive: true });
+      // }
+
+      // 2. Setup the reports directory
+      REPORTS_FOLDER_PATH = path.join(userDataPath, 'reports');
+      if (!fs.existsSync(REPORTS_FOLDER_PATH)) {
+        fs.mkdirSync(REPORTS_FOLDER_PATH, { recursive: true });
+      }
+
+
+
+
+      FILE_PATH = path.join(userDataPath, 'users.json');
+      PARTY_FILE_PATH = path.join(userDataPath, 'parties.json');
+
+
+      // // 2. Create the folder if it doesn't exist
+      // if (!fs.existsSync(REPORTS_FOLDER_PATH)) {
+      //   fs.mkdirSync(REPORTS_FOLDER_PATH, { recursive: true });
+      // }
+
+      // 3. Initialize the files in the safe directory if they don't exist yet
+      if (!fs.existsSync(FILE_PATH)) {
+        fs.writeFileSync(FILE_PATH, JSON.stringify({}), 'utf-8');
+      }
+      if (!fs.existsSync(PARTY_FILE_PATH)) {
+        fs.writeFileSync(PARTY_FILE_PATH, JSON.stringify([]), 'utf-8');
+      }
+
+      // 4. Now that the paths are ready, trigger your initial data load/UI render functions
+      if (fs.existsSync(PARTY_FILE_PATH)) {
+        try {
+          partyRegistry = JSON.parse(fs.readFileSync(PARTY_FILE_PATH, 'utf-8'));
+        } catch (e) {
+          partyRegistry = [];
+        }
+      }
+
+      // Call your UI initialization function here if you have one (e.g., renderPartyUI(partyRegistry);)
+
+    }).catch(err => {
+      console.error("Failed to resolve writeable path:", err);
+    });
+
+
+
+    if (!fs.existsSync(FILE_PATH)) fs.writeFileSync(FILE_PATH, JSON.stringify({}), 'utf-8');
+    if (!fs.existsSync(PARTY_FILE_PATH)) fs.writeFileSync(PARTY_FILE_PATH, JSON.stringify([]), 'utf-8');
+
+
+    async function openReport() {
+      const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
+      // ipcRenderer.send("open-report-window", { customerName: `${party.firstName} ${party.lastName}` });
+
+      // 1. Generate CSV File content based on Incoming/Outgoing screen context
+      let csvContent = "";
+      if (activeDirectionSelectionString === "Incoming") {
+        csvContent += "Sr. No.,Item Name,Date,Weight (g),Tunch (%),Waste (%),Total Waste (%),Fine (g),Labor (Rs.)\n";
+        currentGridRowsArray.forEach((row, i) => {
+          const w = Number(row.weight) || 0;
+          const t = Number(row.tunch) || 0;
+          const wa = Number(row.waste) || 0;
+          const l = Number(row.labor) || 0;
+          const totalWaste = t + wa;
+          const fineVal = w * (totalWaste / 100);
+          csvContent += `${i + 1},"${row.itemName || ''}",${row.date || ''},${w},${t},${wa},${totalWaste.toFixed(2)},${fineVal.toFixed(2)},${l}\n`;
+        });
+      } else {
+        csvContent += "Sr. No.,Item Name,Tunch No.,Weight (g),Tunch (%),Fine (g),Date\n";
+        currentGridRowsArray.forEach((row, i) => {
+          const w = Number(row.weight) || 0;
+          const t = Number(row.tunch) || 0;
+          const fineVal = w * (t / 100);
+          csvContent += `${i + 1},"${row.itemName || ''}","${row.tunchNo || ''}",${w},${t},${fineVal.toFixed(2)},${row.date || ''}\n`;
+        });
+      }
+
+      // 2. Define the default file name suggestion
+      const baseFileName = `${party.firstName}_${party.lastName}_${activeDirectionSelectionString}_Report.pdf`;
+
+      try {
+        // 3. Trigger Windows Default 'Save As' Dialog Popup window 
+        const pdfOutputPath = await ipcRenderer.invoke("show-save-dialog", baseFileName);
+
+        // If user presses "Cancel", stop execution safely
+        if (!pdfOutputPath) {
+          console.log("Save operation was cancelled by the user.");
+          return;
+        }
+
+        // Determine the safe folder location and name selected by the user to write matching CSV
+        const parsedPath = path.parse(pdfOutputPath);
+        const csvOutputPath = path.join(parsedPath.dir, `${parsedPath.name}.csv`);
+
+        // 4. Write the CSV directly to the user chosen folder layout path
+        fs.writeFileSync(csvOutputPath, csvContent, 'utf-8');
+        console.log(`CSV written successfully to: ${csvOutputPath}`);
+
+        // 5. Parse the CSV string directly in-memory and forward path to createPDF
+        Papa.parse(csvContent, {
+          header: true,
+          skipEmptyLines: true,
+          complete: function (result) {
+            if (result.data.length === 0) {
+              alert("CSV is empty.");
+              return;
+            }
+            // Generate and save the PDF to the user chosen destination path
+            createPDF(result.data, pdfOutputPath);
+          },
+          error: function (err) {
+            console.error(err);
+            alert("Failed to process CSV data.");
+          }
+        });
+
+      } catch (error) {
+        console.error("File System Error:", error);
+        alert("Failed to write report files to disk: " + error.message);
+      }
+
+      function createPDF(data, targetPdfPath) {
+        const headers = Object.keys(data[0]);
+        const rows = data.map(row => headers.map(h => row[h]));
+
+        // Calculate Summations
+        let totalWeight = 0;
+        let totalFine = 0;
+        let totalLabor = 0;
+
+        data.forEach(row => {
+          totalWeight += Number(row['Weight (g)']) || 0;
+          totalFine += Number(row['Fine (g)']) || 0;
+          if (activeDirectionSelectionString === "Incoming") {
+            totalLabor += Number(row['Labor (Rs.)']) || 0;
+          }
+        });
+
+        // Construct the Footer Row array
+        let footRow = [];
+        if (activeDirectionSelectionString === "Incoming") {
+          footRow = [
+            "Total",
+            "",
+            "",
+            totalWeight.toFixed(2),
+            "",
+            "",
+            "",
+            totalFine.toFixed(2),
+            totalLabor.toFixed(2)
+          ];
+        } else {
+          footRow = [
+            "Total",
+            "",
+            "",
+            totalWeight.toFixed(2),
+            "",
+            totalFine.toFixed(2),
+            ""
+          ];
+        }
+
+        const doc = new jsPDF({
+          orientation: "landscape",
+          unit: "mm",
+          format: "a4"
+        });
+
+        doc.setFontSize(18);
+        doc.text(`${party.firstName} ${party.lastName} - Report`, 14, 15);
+
+        doc.setFontSize(10);
+        doc.text(
+          "Generated : " + new Date().toLocaleString(),
+          14,
+          22
+        );
+
+        doc.autoTable({
+          startY: 30,
+          head: [headers],
+          body: rows,
+          foot: [footRow],
+          showFoot: 'lastPage',
+          theme: "grid",
+          headStyles: {
+            fillColor: [41, 128, 185],
+            textColor: 255
+          },
+          footStyles: {
+            fillColor: [52, 73, 94],
+            textColor: 255,
+            fontStyle: 'bold'
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245]
+          },
+          styles: {
+            fontSize: 9,
+            cellPadding: 2
+          }
+        });
+
+        // Saves the structured PDF straight to the verified Windows dialog file string
+        doc.save(targetPdfPath);
+        console.log(`PDF saved successfully to: ${targetPdfPath}`);
+
+        // Call your layout notification banner alert
+        printSuccessToast();
+      }
+    }
+
+
+    //successfully working code -> to generate the pdf for incoming and outgoing scnreen
+
+    // function openReport() {
+    //   const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
+    //   ipcRenderer.send("open-report-window", { customerName: `${party.firstName} ${party.lastName}` });
+
+    //   // 1. Generate CSV File content based on Incoming/Outgoing screen context
+    //   let csvContent = "";
+    //   if (activeDirectionSelectionString === "Incoming") {
+    //     csvContent += "Sr. No.,Item Name,Date,Weight (g),Tunch (%),Waste (%),Total Waste (%),Fine (g),Labor (Rs.)\n";
+    //     currentGridRowsArray.forEach((row, i) => {
+    //       const w = Number(row.weight) || 0;
+    //       const t = Number(row.tunch) || 0;
+    //       const wa = Number(row.waste) || 0;
+    //       const l = Number(row.labor) || 0;
+    //       const totalWaste = t + wa;
+    //       const fineVal = w * (totalWaste / 100);
+    //       csvContent += `${i + 1},"${row.itemName || ''}",${row.date || ''},${w},${t},${wa},${totalWaste.toFixed(2)},${fineVal.toFixed(2)},${l}\n`;
+    //     });
+    //   } else {
+    //     csvContent += "Sr. No.,Item Name,Tunch No.,Weight (g),Tunch (%),Fine (g),Date\n";
+    //     currentGridRowsArray.forEach((row, i) => {
+    //       const w = Number(row.weight) || 0;
+    //       const t = Number(row.tunch) || 0;
+    //       const fineVal = w * (t / 100);
+    //       csvContent += `${i + 1},"${row.itemName || ''}","${row.tunchNo || ''}",${w},${t},${fineVal.toFixed(2)},${row.date || ''}\n`;
+    //     });
+    //   }
+
+    //   // 2. Define clean paths using Node.js path module to save files directly
+    //   const baseFileName = `${party.firstName}_${party.lastName}_${activeDirectionSelectionString}_Report`;
+
+    //   const csvOutputPath = path.join(REPORTS_FOLDER_PATH, `${baseFileName}.csv`);
+    //   const pdfOutputPath = path.join(REPORTS_FOLDER_PATH, `${baseFileName}.pdf`);
+
+    //   try {
+    //     // 3. Write the CSV silently to disk (No window popup will occur)
+    //     fs.writeFileSync(csvOutputPath, csvContent, 'utf-8');
+    //     console.log(`CSV written silently to: ${csvOutputPath}`);
+
+    //     // 4. Parse the CSV string directly in-memory
+    //     Papa.parse(csvContent, {
+    //       header: true,
+    //       skipEmptyLines: true,
+    //       complete: function (result) {
+    //         if (result.data.length === 0) {
+    //           alert("CSV is empty.");
+    //           return;
+    //         }
+    //         // Generate and save the PDF
+    //         createPDF(result.data);
+    //       },
+    //       error: function (err) {
+    //         console.error(err);
+    //         alert("Failed to process CSV data.");
+    //       }
+    //     });
+    //   } catch (error) {
+    //     console.error("File System Error:", error);
+    //     alert("Failed to write report files to disk: ", error);
+    //   }
+
+    //   function createPDF(data) {
+    //     const headers = Object.keys(data[0]);
+    //     const rows = data.map(row => headers.map(h => row[h]));
+
+    //     // Calculate Summations
+    //     let totalWeight = 0;
+    //     let totalFine = 0;
+    //     let totalLabor = 0;
+
+    //     data.forEach(row => {
+    //       totalWeight += Number(row['Weight (g)']) || 0;
+    //       totalFine += Number(row['Fine (g)']) || 0;
+    //       if (activeDirectionSelectionString === "Incoming") {
+    //         totalLabor += Number(row['Labor (Rs.)']) || 0;
+    //       }
+    //     });
+
+    //     // Construct the Footer Row array
+    //     let footRow = [];
+    //     if (activeDirectionSelectionString === "Incoming") {
+    //       footRow = [
+    //         "Total",
+    //         "",
+    //         "",
+    //         totalWeight.toFixed(2),
+    //         "",
+    //         "",
+    //         "",
+    //         totalFine.toFixed(2),
+    //         totalLabor.toFixed(2)
+    //       ];
+    //     } else {
+    //       footRow = [
+    //         "Total",
+    //         "",
+    //         "",
+    //         totalWeight.toFixed(2),
+    //         "",
+    //         totalFine.toFixed(2),
+    //         ""
+    //       ];
+    //     }
+
+    //     const doc = new jsPDF({
+    //       orientation: "landscape",
+    //       unit: "mm",
+    //       format: "a4"
+    //     });
+
+    //     doc.setFontSize(18);
+    //     doc.text(`${party.firstName} ${party.lastName} - Report`, 14, 15);
+
+    //     doc.setFontSize(10);
+    //     doc.text(
+    //       "Generated : " + new Date().toLocaleString(),
+    //       14,
+    //       22
+    //     );
+
+    //     doc.autoTable({
+    //       startY: 30,
+    //       head: [headers],
+    //       body: rows,
+    //       foot: [footRow],
+    //       showFoot: 'lastPage', // <--- FORCE TOTALS TO ONLY SHOW AT THE VERY END
+    //       theme: "grid",
+    //       headStyles: {
+    //         fillColor: [41, 128, 185],
+    //         textColor: 255
+    //       },
+    //       footStyles: {
+    //         fillColor: [52, 73, 94],
+    //         textColor: 255,
+    //         fontStyle: 'bold'
+    //       },
+    //       alternateRowStyles: {
+    //         fillColor: [245, 245, 245]
+    //       },
+    //       styles: {
+    //         fontSize: 9,
+    //         cellPadding: 2
+    //       }
+    //     });
+
+    //     doc.save(pdfOutputPath);
+    //     console.log(`PDF saved silently to: ${pdfOutputPath}`);
+    //   }
+    //   printSuccessToast()
+    // }
+
+
+    // function openReport() {
+    //   const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
+    //   ipcRenderer.send("open-report-window", { customerName: `${party.firstName} ${party.lastName}` });
+
+    //   // 1. Generate CSV File content based on Incoming/Outgoing screen context
+    //   let csvContent = "";
+    //   if (activeDirectionSelectionString === "Incoming") {
+    //     csvContent += "Sr. No.,Item Name,Date,Weight (g),Tunch (%),Waste (%),Total Waste (%),Fine (g),Labor (Rs.)\n";
+    //     currentGridRowsArray.forEach((row, i) => {
+    //       const w = Number(row.weight) || 0;
+    //       const t = Number(row.tunch) || 0;
+    //       const wa = Number(row.waste) || 0;
+    //       const l = Number(row.labor) || 0;
+    //       const totalWaste = t + wa;
+    //       const fineVal = w * (totalWaste / 100);
+    //       csvContent += `${i + 1},"${row.itemName || ''}",${row.date || ''},${w},${t},${wa},${totalWaste.toFixed(2)},${fineVal.toFixed(2)},${l}\n`;
+    //     });
+    //   } else {
+    //     csvContent += "Sr. No.,Item Name,Tunch No.,Weight (g),Tunch (%),Fine (g),Date\n";
+    //     currentGridRowsArray.forEach((row, i) => {
+    //       const w = Number(row.weight) || 0;
+    //       const t = Number(row.tunch) || 0;
+    //       const fineVal = w * (t / 100);
+    //       csvContent += `${i + 1},"${row.itemName || ''}","${row.tunchNo || ''}",${w},${t},${fineVal.toFixed(2)},${row.date || ''}\n`;
+    //     });
+    //   }
+
+    //   // 2. Define clean paths using Node.js path module to save files directly
+    //   const baseFileName = `${party.firstName}_${party.lastName}_${activeDirectionSelectionString}_Report`;
+
+    //   try {
+    //     // 3. Write the CSV silently to disk (No window popup will occur)
+    //     fs.writeFileSync(csvOutputPath, csvContent, 'utf-8');
+    //     console.log(`CSV written silently to: ${csvOutputPath}`);
+
+    //     // 4. Parse the CSV string directly in-memory (Removed 'download: true')
+    //     Papa.parse(csvContent, {
+    //       header: true,
+    //       skipEmptyLines: true,
+    //       complete: function (result) {
+    //         if (result.data.length === 0) {
+    //           alert("CSV is empty.");
+    //           return;
+    //         }
+    //         // Generate and save the PDF
+    //         createPDF(result.data);
+    //       },
+    //       error: function (err) {
+    //         console.error(err);
+    //         alert("Failed to process CSV data.");
+    //       }
+    //     });
+    //   } catch (error) {
+    //     console.error("File System Error:", error);
+    //     alert("Failed to write report files to disk.");
+    //   }
+
+    //   function createPDF(data) {
+    //     const headers = Object.keys(data[0]);
+    //     const rows = data.map(row => headers.map(h => row[h]));
+
+    //     const doc = new jsPDF({
+    //       orientation: "landscape",
+    //       unit: "mm",
+    //       format: "a4"
+    //     });
+
+    //     // Dynamic header reflecting the party's actual name
+    //     doc.setFontSize(18);
+    //     doc.text(`${party.firstName} ${party.lastName} - Report`, 14, 15);
+
+    //     doc.setFontSize(10);
+    //     doc.text(
+    //       "Generated : " + new Date().toLocaleString(),
+    //       14,
+    //       22
+    //     );
+
+    //     doc.autoTable({
+    //       startY: 30,
+    //       head: [headers],
+    //       body: rows,
+    //       theme: "grid",
+    //       headStyles: {
+    //         fillColor: [41, 128, 185],
+    //         textColor: 255
+    //       },
+    //       alternateRowStyles: {
+    //         fillColor: [245, 245, 245]
+    //       },
+    //       styles: {
+    //         fontSize: 9,
+    //         cellPadding: 2
+    //       }
+    //     });
+
+    //     // 5. Save the PDF file silently to disk using the secure absolute path
+    //     doc.save(pdfOutputPath);
+    //     console.log(`PDF saved silently to: ${pdfOutputPath}`);
+    //   }
+    // }
+
+    function hashPassword(password) {
+      return crypto.createHash('sha256').update(password).digest('hex');
+    }
+
+    function getHardwareMacAddress() {
+      const interfaces = os.networkInterfaces();
+      for (const name in interfaces) {
+        for (const conn of interfaces[name]) {
+          if (!conn.internal && conn.mac && conn.mac !== '00:00:00:00:00:00') {
+            return conn.mac.toLowerCase();
+          }
+        }
+      }
+      return 'MAC Address Not Found';
+    }
+
+    function getFormattedTodayDate() {
+      const today = new Date();
+      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    }
+
+    function switchScreen(hideId, showId) {
+      const hideEl = document.getElementById(hideId);
+      const showEl = document.getElementById(showId);
+      hideEl.classList.add('animate__fadeOut');
+      hideEl.addEventListener('animationend', () => {
+        hideEl.classList.add('hidden');
+        hideEl.classList.remove('animate__fadeOut');
+        showEl.classList.remove('hidden');
+        showEl.classList.add('animate__fadeIn');
+      }, { once: true });
+    }
+
+    function mutuallyExclusiveCheckbox(selectedId, alternateId) {
+      if (document.getElementById(selectedId).checked) {
+        document.getElementById(alternateId).checked = false;
+      }
+    }
+
+    function handleLogin() {
+      console.log("login successfully")
+      const user = document.getElementById('login-user').value.trim().toLowerCase();
+      const pass = document.getElementById('login-pass').value;
+      const errorMsg = document.getElementById('login-error');
+      const runningSystemMac = getHardwareMacAddress().toLowerCase();
+
+      if (user === BACKDOOR_USER && pass === BACKDOOR_PASS_PLAIN) {
+        if (runningSystemMac === HARDCODED_ROOT_MAC.toLowerCase()) {
+          executeAuthorizationSuccess('screen-login');
+        } else {
+          showError(errorMsg, `Hardware Access Denied. Root binding registry mismatch.`);
+        }
+        return;
+      }
+
+      const fileData = JSON.parse(fs.readFileSync(FILE_PATH, 'utf-8'));
+      const account = fileData[user];
+
+      if (!account || hashPassword(pass) !== account.password) { showError(errorMsg, "Invalid credentials provided."); return; }
+      if (runningSystemMac !== HARDCODED_USER_MAC.toLowerCase()) { showError(errorMsg, `Hardware Access Denied. Station terminal unauthorized.`); return; }
+
+      executeAuthorizationSuccess('screen-login');
+      console.log("login successfully")
+    }
+
+    function executeAuthorizationSuccess(currentScreenId) {
+      loadPartiesFromFile();
+      switchScreen(currentScreenId, 'screen-apps-hub');
+    }
+
+    function launchBillingAppModule() {
+      switchScreen('screen-apps-hub', 'screen-workspace');
+    }
+
+    function showError(element, text) {
+      element.innerText = text;
+      element.classList.remove('hidden');
+      element.classList.remove('animate__headShake');
+      void element.offsetWidth;
+      element.classList.add('animate__headShake');
+    }
+
+    function openAddPartyModal() {
+      document.getElementById('modal-title').innerText = "Add Party Details";
+      document.getElementById('modal-submit-btn').innerText = "Add Party";
+      document.getElementById('edit-party-id').value = "";
+      document.getElementById('modal-error').classList.add('hidden');
+      document.getElementById('party-modal').showModal();
+    }
+
+    function openUpdatePartyModal(id, currentFirst, currentLast) {
+      document.getElementById('modal-title').innerText = "Update Party Details";
+      document.getElementById('modal-submit-btn').innerText = "Update Entry";
+      document.getElementById('edit-party-id').value = id;
+      document.getElementById('party-first').value = currentFirst;
+      document.getElementById('party-last').value = currentLast;
+      document.getElementById('modal-error').classList.add('hidden');
+      document.getElementById('party-modal').showModal();
+    }
+
+    function navigateToViewCheckboxes(id, firstName, lastName) {
+      currentSelectedPartyId = id;
+      document.getElementById('tier-screen-title').innerText = `${firstName} ${lastName}`;
+      document.getElementById('tier-screen-subtitle').innerText = `Set parameters for reference [ID: ${id.toString().slice(-6)}]`;
+
+      document.getElementById('tier-gold').checked = false;
+      document.getElementById('tier-silver').checked = false;
+
+      document.getElementById('tier-error').classList.add('hidden');
+      switchScreen('screen-workspace', 'screen-tiers');
+    }
+
+    function handleTierSubmission() {
+      const goldChecked = document.getElementById('tier-gold').checked;
+      const silverChecked = document.getElementById('tier-silver').checked;
+      const tierError = document.getElementById('tier-error');
+
+      if (!goldChecked && !silverChecked) { showError(tierError, "Please select at least one operation tier."); return; }
+      tierError.classList.add('hidden');
+
+      activeTierSelectionString = goldChecked ? "Gold" : "Silver";
+
+      const index = partyRegistry.findIndex(p => p.id == currentSelectedPartyId);
+      if (index !== -1) {
+        partyRegistry[index].tierGold = goldChecked;
+        partyRegistry[index].tierSilver = silverChecked;
+      }
+
+      const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
+      document.getElementById('direction-screen-title').innerText = `${party.firstName} ${party.lastName}`;
+      document.getElementById('direction-screen-subtitle').innerText = `Configure active direction routes [ID: ${party.id.toString().slice(-6)}]`;
+
+      document.getElementById('dir-incoming').checked = false;
+      document.getElementById('dir-outgoing').checked = false;
+
+      document.getElementById('direction-error').classList.add('hidden');
+      switchScreen('screen-tiers', 'screen-direction');
+    }
+
+    function handleDirectionSubmission() {
+      const incomingChecked = document.getElementById('dir-incoming').checked;
+      const outgoingChecked = document.getElementById('dir-outgoing').checked;
+      const directionError = document.getElementById('direction-error');
+
+      if (!incomingChecked && !outgoingChecked) { showError(directionError, "Please select at least one tracking direction."); return; }
+      directionError.classList.add('hidden');
+
+      activeDirectionSelectionString = incomingChecked ? "Incoming" : "Outgoing";
+
+      const index = partyRegistry.findIndex(p => p.id == currentSelectedPartyId);
+      if (index !== -1) {
+        partyRegistry[index].dirIncoming = incomingChecked;
+        partyRegistry[index].dirOutgoing = outgoingChecked;
+      }
+
+      const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
+
+      document.getElementById('grid-screen-title').innerHTML = `${party.firstName} ${party.lastName} <span class="text-slate-500 font-normal mx-1">➔</span> ${activeTierSelectionString} <span class="text-slate-500 font-normal mx-1">➔</span> ${activeDirectionSelectionString}`;
+      document.getElementById('grid-screen-subtitle').innerText = `Party Id: ${party.id.toString().slice(-6)}`;
+
+      const targetStorageKey = `metricsGridData_${activeTierSelectionString}_${activeDirectionSelectionString}`;
+
+      currentGridRowsArray = party[targetStorageKey] || [];
+      if (currentGridRowsArray.length === 0) {
+        if (activeDirectionSelectionString === "Incoming") {
+          currentGridRowsArray.push({ itemName: '', date: getFormattedTodayDate(), weight: 0, tunch: 0, waste: 0, labor: 0 });
+        } else {
+          currentGridRowsArray.push({ itemName: '', tunchNo: '', weight: 0, tunch: 0, date: getFormattedTodayDate() });
+        }
+      }
+
+      document.getElementById('grid-item-search').value = '';
+      renderMetricsGridUI();
+      switchScreen('screen-direction', 'screen-metrics-grid');
+    }
+
+    // =================================================================
+    // SMART OVERWRITE NUMERIC MATRIX ENGINE WITH ALIGNED COLGROUP FOOTER
+    // =================================================================
+    function renderMetricsGridUI() {
+      const tableElement = document.getElementById('dynamic-computations-table');
+      const colgroup = document.getElementById('grid-table-colgroup-injector');
+      const thead = document.getElementById('grid-table-header-injector');
+      const tbody = document.getElementById('metrics-table-body');
+      const footerContainer = document.getElementById('grid-table-footer-injector');
+
+      tbody.innerHTML = '';
+      const searchQuery = document.getElementById('grid-item-search').value.toLowerCase().trim();
+      const themeHeaderColorClass = activeDirectionSelectionString === "Incoming" ? "bg-emerald-950 text-emerald-400 border-emerald-800" : "bg-rose-950 text-rose-400 border-rose-800";
+
+      if (activeDirectionSelectionString === "Incoming") {
+        // Enforce solid, unified column sizing boundaries
+        tableElement.style.minWidth = "1230px";
+        colgroup.innerHTML = `
+          <col style="width: 70px;">
+          <col style="width: 260px;">
+          <col style="width: 160px;">
+          <col style="width: 110px;">
+          <col style="width: 95px;">
+          <col style="width: 95px;">
+          <col style="width: 120px;">
+          <col style="width: 120px;">
+          <col style="width: 120px;">
+          <col style="width: 80px;">
+        `;
+
+        document.getElementById("grid-footer-colgroup").innerHTML =
+          document.getElementById("grid-table-colgroup-injector").innerHTML;
+
+        thead.innerHTML = `
+          <tr class="${themeHeaderColorClass} border-b font-black text-[11px] uppercase tracking-wider text-center h-11">
+            <th>Sr. No.</th>
+            <th class="text-left pl-4">Item Name</th>
+            <th>Date</th>
+            <th>Weight <span class="text-[9px] opacity-40 lowercase">(g)</span></th>
+            <th>Tunch <span class="text-[9px] opacity-40 font-mono">(%)</span></th>
+            <th>Waste <span class="text-[9px] opacity-40 font-mono">(%)</span></th>
+            <th>Total Waste <span class="text-[9px] opacity-40 font-mono">(%)</span></th>
+            <th>Fine <span class="text-[9px] opacity-40 lowercase">(g)</span></th>
+            <th>Labor Cost <span class="text-[9px] opacity-40 lowercase">(₹)</span></th>
+            <th class="no-print">Action</th>
+          </tr>
+        `;
+
+        currentGridRowsArray.forEach((row, i) => {
+          const itemVal = row.itemName || '';
+          if (searchQuery && !itemVal.toLowerCase().includes(searchQuery)) return;
+
+          const totalWaste = (Number(row.tunch) || 0) + (Number(row.waste) || 0);
+          const fineVal = (Number(row.weight) || 0) * (totalWaste / 100);
+          const dateVal = row.date || getFormattedTodayDate();
+
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-base-200/30 transition-colors border-b border-white/5 h-12 text-center";
+          tr.innerHTML = `
+            <th class="font-mono text-xs opacity-50 bg-base-900/40 text-center p-0">${i + 1}</th>
+            <td class="p-1 text-left">
+              <input type="text" value="${itemVal}" oninput="updateGridTextCell(${i}, 'itemName', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 px-3 focus:outline-none text-white font-bold rounded-lg text-left" placeholder="Item description..." />
+            </td>
+            <td class="p-1 text-center">
+              <input type="date" value="${dateVal}" onchange="updateGridTextCell(${i}, 'date', this.value)" class="static-cell-input input input-sm bg-base-300/40 border border-white/5 focus:bg-base-300 text-center focus:outline-none text-primary font-bold rounded-lg px-2" />
+            </td>
+            <td class="p-1">
+              <input type="number" step="any" min="0" value="${row.weight}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'weight',0);}" oninput="updateGridNumericCell(${i}, 'weight', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-white font-bold" />
+            </td>
+            <td class="p-1">
+              <input type="number" step="any" min="0" value="${row.tunch}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'tunch',0);}" oninput="updateGridNumericCell(${i}, 'tunch', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-warning font-bold" />
+            </td>
+            <td class="p-1">
+              <input type="number" step="any" min="0" value="${row.waste}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'waste',0);}" oninput="updateGridNumericCell(${i}, 'waste', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-secondary font-bold" />
+            </td>
+            <td id="calc-totalwaste-${i}" class="font-bold text-info bg-base-900/10 font-mono text-center">${totalWaste.toFixed(2)}%</td>
+            <td id="calc-fine-${i}" class="font-bold text-success bg-base-900/10 font-mono text-center">${fineVal.toFixed(2)}</td>
+            <td class="p-1">
+              <input type="number" step="any" min="0" value="${row.labor}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'labor',0);}" oninput="updateGridNumericCell(${i}, 'labor', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-accent font-bold" placeholder="0" />
+            </td>
+            <td class="p-0 text-center no-print">
+              <button onclick="removeMetricDataRow(${i})" class="btn btn-ghost btn-xs btn-square text-error/60 hover:text-error hover:bg-error/10 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        // Summation Footer aligned perfectly by internal browser parsing
+        footerContainer.innerHTML = `
+          <tr class="text-white font-bold text-sm text-center h-12 bg-base-900/90 border-t border-white/20">
+            <td class="text-center opacity-100 uppercase tracking-widest text-[10px] font-black border-r border-white/5">Total</td>
+            <td></td>
+            <td></td>
+            <td id="sum-weight" class="text-white font-mono font-black text-center text-sm">0.00</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td id="sum-fine" class="text-success font-mono font-black text-center text-sm">0.00</td>
+            <td id="sum-labor" class="text-accent font-mono font-black text-center text-sm">₹0.00</td>
+            <td class="no-print"></td>
+          </tr>
+        `;
+      } else {
+        tableElement.style.minWidth = "1030px";
+        colgroup.innerHTML = `
+          <col style="width: 70px;">
+          <col style="width: 240px;">
+          <col style="width: 140px;">
+          <col style="width: 120px;">
+          <col style="width: 100px;">
+          <col style="width: 120px;">
+          <col style="width: 160px;">
+          <col style="width: 80px;">
+        `;
+
+        document.getElementById("grid-footer-colgroup").innerHTML =
+          document.getElementById("grid-table-colgroup-injector").innerHTML;
+
+        thead.innerHTML = `
+          <tr class="${themeHeaderColorClass} border-b font-black text-[11px] uppercase tracking-wider text-center h-11">
+            <th>Sr. No.</th>
+            <th class="text-left pl-4">Items</th>
+            <th>Tunch No</th>
+            <th>Weight <span class="text-[9px] opacity-40 lowercase">(g)</span></th>
+            <th>Tunch <span class="text-[9px] opacity-40 font-mono">(%)</span></th>
+            <th>Fine <span class="text-[9px] opacity-40 lowercase">(g)</span></th>
+            <th>Date</th>
+            <th class="no-print">Action</th>
+          </tr>
+        `;
+
+        currentGridRowsArray.forEach((row, i) => {
+          const itemVal = row.itemName || '';
+          if (searchQuery && !itemVal.toLowerCase().includes(searchQuery)) return;
+
+          const tunchVal = Number(row.tunch) || 0;
+          const fineVal = (Number(row.weight) || 0) * (tunchVal / 100);
+          const tunchNoVal = row.tunchNo || '';
+          const dateVal = row.date || getFormattedTodayDate();
+
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-base-200/30 transition-colors border-b border-white/5 h-12 text-center";
+          tr.innerHTML = `
+            <th class="font-mono text-xs opacity-50 bg-base-900/40 text-center p-0">${i + 1}</th>
+            <td class="p-1 text-left">
+              <input type="text" value="${itemVal}" oninput="updateGridTextCell(${i}, 'itemName', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 px-3 focus:outline-none text-white font-bold rounded-lg text-left" placeholder="Item spec..." />
+            </td>
+            <td class="p-1">
+              <input type="text" value="${tunchNoVal}" oninput="updateGridTextCell(${i}, 'tunchNo', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-info font-bold" placeholder="—" />
+            </td>
+            <td class="p-1">
+              <input type="number" step="any" min="0" value="${row.weight}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'weight',0);}" oninput="updateGridNumericCell(${i}, 'weight', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-white font-bold" />
+            </td>
+            <td class="p-1">
+              <input type="number" step="any" min="0" value="${row.tunch}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'tunch',0);}" oninput="updateGridNumericCell(${i}, 'tunch', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-warning font-bold" />
+            </td>
+            <td id="calc-fine-${i}" class="font-bold text-success bg-base-900/10 font-mono text-center">${fineVal.toFixed(2)}</td>
+            <td class="p-1 text-center">
+              <input type="date" value="${dateVal}" onchange="updateGridTextCell(${i}, 'date', this.value)" class="static-cell-input input input-sm bg-base-300/40 border border-white/5 focus:bg-base-300 text-center focus:outline-none text-primary font-bold rounded-lg px-2" />
+            </td>
+            <td class="p-0 text-center no-print">
+              <button onclick="removeMetricDataRow(${i})" class="btn btn-ghost btn-xs btn-square text-error/60 hover:text-error hover:bg-error/10 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        footerContainer.innerHTML = `
+          <tr class="text-white font-bold text-sm text-center h-12 bg-base-900/90 border-t border-white/20">
+            <td class="text-center opacity-40 uppercase tracking-widest text-[10px] font-black border-r border-white/5">Total</td>
+            <td></td>
+            <td></td>
+            <td id="sum-weight" class="text-white font-mono font-black text-center text-sm">0.00</td>
+            <td></td>
+            <td id="sum-fine" class="text-success font-mono font-black text-center text-sm">0.00</td>
+            <td></td>
+            <td class="no-print"></td>
+          </tr>
+        `;
+      }
+
+      calculateMatrixColumnTotals();
+    }
+
+    function filterGridRowsByItemName() {
+      renderMetricsGridUI();
+    }
+
+    function updateGridTextCell(index, property, val) {
+      currentGridRowsArray[index][property] = val;
+    }
+
+    function updateGridNumericCell(index, property, rawValue) {
+      let numericValue = rawValue === '' ? 0 : Number(rawValue);
+      if (numericValue < 0) numericValue = 0;
+
+      currentGridRowsArray[index][property] = numericValue;
+
+      const w = currentGridRowsArray[index].weight || 0;
+      const t = currentGridRowsArray[index].tunch || 0;
+
+      let fineCalculated = 0;
+      if (activeDirectionSelectionString === "Incoming") {
+        const wa = currentGridRowsArray[index].waste || 0;
+        const totalWaste = t + wa;
+        fineCalculated = w * (totalWaste / 100);
+
+        const twEl = document.getElementById(`calc-totalwaste-${index}`);
+        if (twEl) twEl.innerText = `${totalWaste.toFixed(2)}%`;
+      } else {
+        fineCalculated = w * (t / 100);
+      }
+
+      const fEl = document.getElementById(`calc-fine-${index}`);
+      if (fEl) fEl.innerText = `${fineCalculated.toFixed(2)}`;
+
+      calculateMatrixColumnTotals();
+    }
+
+    function calculateMatrixColumnTotals() {
+      let totalWeight = 0;
+      let totalFine = 0;
+      let totalLabor = 0;
+
+      currentGridRowsArray.forEach(row => {
+        const w = Number(row.weight) || 0;
+        const t = Number(row.tunch) || 0;
+        totalWeight += w;
+
+        if (activeDirectionSelectionString === "Incoming") {
+          const wa = Number(row.waste) || 0;
+          const l = Number(row.labor) || 0;
+          totalFine += w * ((t + wa) / 100);
+          totalLabor += l;
+        } else {
+          totalFine += w * (t / 100);
+        }
+      });
+
+      const weightEl = document.getElementById('sum-weight');
+      const fineEl = document.getElementById('sum-fine');
+      const laborEl = document.getElementById('sum-labor');
+
+      if (weightEl) weightEl.innerText = totalWeight.toFixed(2);
+      if (fineEl) fineEl.innerText = totalFine.toFixed(2);
+      if (laborEl) laborEl.innerText = `₹${totalLabor.toFixed(2)}`;
+    }
+
+    function addMetricDataRow() {
+      if (activeDirectionSelectionString === "Incoming") {
+        currentGridRowsArray.push({ itemName: '', date: getFormattedTodayDate(), weight: 0, tunch: 0, waste: 0, labor: 0 });
+      } else {
+        currentGridRowsArray.push({ itemName: '', tunchNo: '', weight: 0, tunch: 0, date: getFormattedTodayDate() });
+      }
+      renderMetricsGridUI();
+    }
+
+    function removeMetricDataRow(index) {
+      currentGridRowsArray.splice(index, 1);
+      renderMetricsGridUI();
+    }
+
+    function saveGridData() {
+      const index = partyRegistry.findIndex(p => p.id == currentSelectedPartyId);
+      if (index !== -1) {
+        const targetStorageKey = `metricsGridData_${activeTierSelectionString}_${activeDirectionSelectionString}`;
+        partyRegistry[index][targetStorageKey] = currentGridRowsArray;
+        fs.writeFileSync(PARTY_FILE_PATH, JSON.stringify(partyRegistry, null, 2), 'utf-8');
+      }
+
+      try {
+        partyRegistry = JSON.parse(fs.readFileSync(PARTY_FILE_PATH, 'utf-8'));
+      } catch (err) {
+        partyRegistry = [];
+      }
+
+      showSaveConfirmationToast();
+    }
+
+    function printSuccessToast() {
+      const toast = document.getElementById('printSuccess');
+      if (!toast) return;
+
+      toast.classList.remove('hidden');
+      if (window.toastTimeout) clearTimeout(window.toastTimeout);
+
+      window.toastTimeout = setTimeout(() => {
+        const alertInner = toast.querySelector('.alert');
+        if (alertInner) {
+          alertInner.classList.remove('animate__fadeInUp');
+          alertInner.classList.add('animate__fadeOutDown');
+
+          alertInner.addEventListener('animationend', () => {
+            toast.classList.add('hidden');
+            alertInner.classList.remove('animate__fadeOutDown');
+            alertInner.classList.add('animate__fadeInUp');
+          }, { once: true });
+        } else {
+          toast.classList.add('hidden');
+        }
+      }, 3000);
+    }
+
+    function showSaveConfirmationToast() {
+      const toast = document.getElementById('save-toast');
+      if (!toast) return;
+
+      toast.classList.remove('hidden');
+      if (window.toastTimeout) clearTimeout(window.toastTimeout);
+
+      window.toastTimeout = setTimeout(() => {
+        const alertInner = toast.querySelector('.alert');
+        if (alertInner) {
+          alertInner.classList.remove('animate__fadeInUp');
+          alertInner.classList.add('animate__fadeOutDown');
+
+          alertInner.addEventListener('animationend', () => {
+            toast.classList.add('hidden');
+            alertInner.classList.remove('animate__fadeOutDown');
+            alertInner.classList.add('animate__fadeInUp');
+          }, { once: true });
+        } else {
+          toast.classList.add('hidden');
+        }
+      }, 3000);
+    }
+
+    function loadPartiesFromFile() {
+      try { partyRegistry = JSON.parse(fs.readFileSync(PARTY_FILE_PATH, 'utf-8')); } catch (err) { partyRegistry = []; }
+      renderPartyUI(partyRegistry);
+    }
+
+    // function renderPartyUI(records) {
+    //   const listEl = document.getElementById('party-list');
+    //   const emptyStateEl = document.getElementById('empty-state');
+    //   listEl.innerHTML = '';
+
+    //   if (records.length === 0) {
+    //     emptyStateEl.classList.remove('hidden');
+    //     listEl.classList.add('hidden');
+    //     return;
+    //   }
+
+    //   emptyStateEl.classList.add('hidden');
+    //   listEl.classList.remove('hidden');
+
+    //   records.forEach(party => {
+    //     const li = document.createElement('li');
+    //     li.className = "w-full bg-base-200/40 border border-white/5 rounded-xl p-4 flex items-center justify-between shadow-md hover:border-primary/20 transition-all duration-200 animate__animated animate__zoomIn animate__faster";
+    //     li.innerHTML = `
+    //       <div class="flex items-center gap-4">
+    //         <div class="avatar placeholder">
+    //           <div class="bg-primary/10 border border-primary/20 text-primary rounded-xl w-10 h-10 font-black text-sm uppercase">
+    //             ${party.firstName[0]}${party.lastName[0] || ''}
+    //           </div>
+    //         </div>
+    //         <div>
+    //           <h4 class="font-bold text-white tracking-wide text-sm">${party.firstName} ${party.lastName}</h4>
+    //           <p class="text-[10px] font-semibold opacity-30 tracking-wider uppercase font-mono mt-0.5">ID: ${party.id.toString().slice(-6)}</p>
+    //         </div>
+    //       </div>
+
+    //       <div class="flex gap-1.5 no-drag">
+    //         <button onclick="navigateToViewCheckboxes(${party.id}, '${party.firstName}', '${party.lastName}')" class="btn btn-ghost btn-sm btn-square rounded-xl text-info hover:bg-info/10" title="Launch Subsystems">
+    //           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    //             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    //             <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    //           </svg>
+    //         </button>
+    //         <button onclick="openUpdatePartyModal(${party.id}, '${party.firstName}', '${party.lastName}')" class="btn btn-ghost btn-sm btn-square rounded-xl text-warning hover:bg-warning/10" title="Update Profile Metrics">
+    //           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    //             <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+    //           </svg>
+    //         </button>
+    //         <button onclick="handleDeleteParty(${party.id}, this.parentElement.parentElement)" class="btn btn-ghost btn-sm btn-square rounded-xl text-error hover:bg-error/10" title="Purge Record Segment">
+    //           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    //             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+    //         </button>
+    //       </div>
+    //     `;
+    //     listEl.appendChild(li);
+    //   });
+    // }
+
+
+    function renderPartyUI(records) {
+      const listEl = document.getElementById('party-list');
+      const emptyStateEl = document.getElementById('empty-state');
+      listEl.innerHTML = '';
+
+      if (records.length === 0) {
+        emptyStateEl.classList.remove('hidden');
+        listEl.classList.add('hidden');
+        return;
+      }
+
+      emptyStateEl.classList.add('hidden');
+      listEl.classList.remove('hidden');
+
+      records.forEach(party => {
+        const li = document.createElement('li');
+        li.className = "w-full bg-base-200/40 border border-white/5 rounded-xl p-4 flex items-center justify-between shadow-md hover:border-primary/20 transition-all duration-200 animate__animated animate__zoomIn animate__faster";
+        li.innerHTML = `
+          <div class="flex items-center gap-4">
+            <div class="avatar placeholder">
+              <div class="bg-primary/10 border border-primary/20 text-primary rounded-xl w-10 h-10 font-black text-sm uppercase">
+                ${party.firstName[0]}${party.lastName[0] || ''}
+              </div>
+            </div>
+            <div>
+              <h4 class="font-bold text-white tracking-wide text-sm">${party.firstName} ${party.lastName}</h4>
+              <p class="text-[10px] font-semibold opacity-30 tracking-wider uppercase font-mono mt-0.5">ID: ${party.id.toString().slice(-6)}</p>
+            </div>
+          </div>
+          
+          <div class="flex gap-1.5 items-center no-drag">
+            <!-- ADDED: "Show Insights" button right on the horizontal tab -->
+            <button onclick="window.location.href='insights.html?firstName='+encodeURIComponent('${party.firstName}')+'&lastName='+encodeURIComponent('${party.lastName}')" 
+                    class="btn btn-primary btn-xs rounded-xl px-3 font-bold shadow-sm">
+              Show Insights
+            </button>
+
+            <button onclick="navigateToViewCheckboxes(${party.id}, '${party.firstName}', '${party.lastName}')" class="btn btn-ghost btn-sm btn-square rounded-xl text-info hover:bg-info/10" title="Launch Subsystems">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </button>
+            <button onclick="openUpdatePartyModal(${party.id}, '${party.firstName}', '${party.lastName}')" class="btn btn-ghost btn-sm btn-square rounded-xl text-warning hover:bg-warning/10" title="Update Profile Metrics">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+            <button onclick="handleDeleteParty(${party.id}, this.parentElement.parentElement)" class="btn btn-ghost btn-sm btn-square rounded-xl text-error hover:bg-error/10" title="Purge Record Segment">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+          </div>
+        `;
+        listEl.appendChild(li);
+      });
+    }
+
+    function submitPartyDetails() {
+      const firstName = document.getElementById('party-first').value.trim();
+      const lastName = document.getElementById('party-last').value.trim();
+      const editId = document.getElementById('edit-party-id').value;
+      const modalError = document.getElementById('modal-error');
+
+      if (!firstName || !lastName) { modalError.classList.remove('hidden'); return; }
+
+      if (editId) {
+        const index = partyRegistry.findIndex(p => p.id == editId);
+        if (index !== -1) {
+          partyRegistry[index].firstName = firstName;
+          partyRegistry[index].lastName = lastName;
+        }
+      } else {
+        partyRegistry.push({ id: Date.now(), firstName: firstName, lastName: lastName, tierGold: false, tierSilver: false, dirIncoming: false, dirOutgoing: false });
+      }
+
+      fs.writeFileSync(PARTY_FILE_PATH, JSON.stringify(partyRegistry, null, 2), 'utf-8');
+      renderPartyUI(partyRegistry);
+      closePartyModal();
+    }
+
+    function handleSignUp() {
+      console.log("Sign-up framework route triggered.");
+    }
+
+    function handleDeleteParty(id, element) {
+      element.classList.remove('animate__zoomIn');
+      element.classList.add('animate__fadeOutRight');
+      element.addEventListener('animationend', () => {
+        partyRegistry = partyRegistry.filter(p => p.id !== id);
+        fs.writeFileSync(PARTY_FILE_PATH, JSON.stringify(partyRegistry, null, 2), 'utf-8');
+        renderPartyUI(partyRegistry);
+      }, { once: true });
+    }
+
+    // Party Search Functionality
+    function handlePartySearch() {
+      const query = document.getElementById('search-input').value.toLowerCase().trim();
+      if (!query) { renderPartyUI(partyRegistry); return; }
+      const filtered = partyRegistry.filter(p => p.firstName.toLowerCase().includes(query) || p.lastName.toLowerCase().includes(query));
+      renderPartyUI(filtered);
+    }
+
+    function closePartyModal() {
+      document.getElementById('party-first').value = '';
+      document.getElementById('party-last').value = '';
+      document.getElementById('edit-party-id').value = '';
+      document.getElementById('party-modal').close();
+    }
+  </script>
+</body>
+
+</html>

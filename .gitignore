@@ -1,0 +1,59 @@
+# ====================================================================
+# Electron.js & Node.js Core
+# ====================================================================
+# Dependency directory (Never commit this, it can be reinstalled via npm/yarn)
+node_modules/
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment variables (API keys, secrets)
+.env
+.env.local
+.env.*.local
+
+# ====================================================================
+# Electron Build & Packaging Outputs
+# ====================================================================
+# Output directories from electron-builder, electron-forge, or electron-packager
+/dist/
+/out/
+/build/
+/release/
+
+# Packages created by packaging tools (.exe, .dmg, .deb, .zip, etc.)
+*.exe
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.zip
+*.tar.gz
+*.asar
+
+# ====================================================================
+# IDEs and Editors
+# ====================================================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# ====================================================================
+# System Files
+# ====================================================================
+# macOS trash / thumbnail files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows thumbnail caches
+Thumbs.db
+ehthumbs.db
+DumpStack.log.tmp
