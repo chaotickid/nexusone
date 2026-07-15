@@ -20,6 +20,7 @@
     "appId": "com.app.NexusOne",
     "productName": "NexusOne",
     "win": {
+      "icon": "assets/icon.ico",
       "target": [
         "portable",
         "nsis"

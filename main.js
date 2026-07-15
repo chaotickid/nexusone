@@ -1,8 +1,14 @@
 // Added dialog to the electron import and added path module below
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
+const fs = require("fs"); // FIX 1: Required the 'fs' module
 
 let mainWindow;
+
+// Expose synchronous fallback environment mapping
+ipcMain.on("get-user-data-path-sync", (event) => {
+    event.returnValue = app.getPath("userData");
+});
 
 ipcMain.handle("get-user-data-path", () => {
     return app.getPath("userData");
@@ -22,10 +28,28 @@ ipcMain.handle("show-save-dialog", async (event, defaultName) => {
 });
 
 function createWindow() {
+    const userIconPath = path.join(app.getPath('userData'), 'assets', 'icon.ico');
+    const finalIcon = fs.existsSync(userIconPath) ? userIconPath : null;
+
+    // --- PACKAGING DISK CORRECTION LAYER ---
+    const userDataPath = app.getPath("userData");
+    const targetUsersFile = path.join(userDataPath, "users.json");
+    const targetPartiesFile = path.join(userDataPath, "parties.json");
+
+    // Initialize databases safely on user system root if missing
+    if (!fs.existsSync(targetUsersFile)) {
+        fs.writeFileSync(targetUsersFile, JSON.stringify({}), "utf-8");
+    }
+    if (!fs.existsSync(targetPartiesFile)) {
+        fs.writeFileSync(targetPartiesFile, JSON.stringify([]), "utf-8");
+    }
+    // ---------------------------------------
+
     mainWindow = new BrowserWindow({
         width: 1280,
         height: 800,
-        frame: false, // Kept exactly as you had it
+        icon: finalIcon, 
+        frame: false, 
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
@@ -33,7 +57,7 @@ function createWindow() {
     });
 
     mainWindow.maximize();
-    mainWindow.loadFile("index.html"); // Kept exactly as you had it
+    mainWindow.loadFile("index.html");
 }
 
 app.whenReady().then(createWindow);

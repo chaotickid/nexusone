@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Secure Workspace Terminal</title>
+  <title>Nexus One</title>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
@@ -243,20 +243,6 @@
         <span class="text-lg font-black text-white tracking-wide">Expense Manager</span>
         <span class="text-[10px] opacity-40 mt-1 text-center">Dashboard financial asset tracking analytics</span>
       </button>
-      <!-- <div
-        class="bg-base-200/10 border-2 border-dashed border-white/5 rounded-2xl p-8 flex flex-col items-center justify-center aspect-square opacity-40 cursor-not-allowed relative">
-        <span
-          class="absolute top-3 right-3 text-[9px] bg-white/10 text-white/60 font-black px-2 py-0.5 rounded-md tracking-wider uppercase">Later</span>
-        <div class="p-5 rounded-2xl bg-white/5 text-white/40 border border-white/5 mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-            stroke="currentColor" class="w-10 h-10">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75c.621 0 1.125.504 1.125 1.125v1.875c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 7.5V5.625c0-.621.504-1.125 1.125-1.125Z" />
-          </svg>
-        </div>
-        <span class="text-lg font-black text-white/50 tracking-wide">Expense Manager</span>
-        <span class="text-[10px] opacity-30 mt-1 text-center">Dashboard financial asset tracking analytics</span>
-      </div> -->
     </div>
   </div>
 
@@ -666,12 +652,18 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script> -->
   <script>
 
+    window.onerror = function (message, source, lineno, colno, error) {
+      alert("CRASH REPORT: \n" + message + "\nLine: " + lineno);
+      return true; // Prevents the error from disappearing
+    };
+
     // 1. Core Node.js and Electron Modules
     const fs = require('fs');
     const path = require('path');
     const os = require('os');
     const crypto = require('crypto');
     const { ipcRenderer } = require('electron');
+    const { shell } = require('electron');
 
     // 2. Third-Party Libraries (Installed via npm)
     const Papa = require('papaparse');
@@ -681,82 +673,48 @@
     // 3. Inject the autoTable plugin into jsPDF so that `doc.autoTable()` syntax works
     applyPlugin(jsPDF);
 
-    // 4. App Constants & Paths
-    const csvFilePath = path.join(__dirname, 'Sanjay_Patil_Incoming_Report.csv');
-    const pdfOutputPath = path.join(__dirname, 'Employee_Report.pdf');
-    // const FILE_PATH = path.join(__dirname, 'users.json');
-    // const PARTY_FILE_PATH = path.join(__dirname, 'parties.json');
-
     const HARDCODED_ROOT_MAC = "74:13:ea:36:1a:50";
     const HARDCODED_USER_MAC = "74:13:ea:36:1a:50";
 
     const BACKDOOR_USER = "root";
     const BACKDOOR_PASS_PLAIN = "root";
 
-    let partyRegistry = [];
     let currentSelectedPartyId = null;
 
     let activeTierSelectionString = "";
     let activeDirectionSelectionString = "";
     let currentGridRowsArray = [];
 
+    // 1. Fetch the user profile path INSTANTLY on startup synchronously
+    const userDataPath = ipcRenderer.sendSync('get-user-data-path-sync');
 
+    // 2. Allocate global path variables instantly
+    const REPORTS_FOLDER_PATH = path.join(userDataPath, 'reports');
+    const FILE_PATH = path.join(userDataPath, 'users.json');
+    const PARTY_FILE_PATH = path.join(userDataPath, 'parties.json');
 
-    // 1. Declare variables globally so the rest of your functions can use them
-    let FILE_PATH;
-    let PARTY_FILE_PATH;
-    let REPORTS_FOLDER_PATH;
+    // 3. Initialize folders synchronously if they don't exist yet
+    if (!fs.existsSync(REPORTS_FOLDER_PATH)) {
+      fs.mkdirSync(REPORTS_FOLDER_PATH, { recursive: true });
+    }
 
-    // 2. Safely fetch the production-safe path from the main process
-    ipcRenderer.invoke("get-user-data-path").then((userDataPath) => {
+    // 4. Initialize storage files safely with empty default states if missing
+    if (!fs.existsSync(FILE_PATH)) {
+      fs.writeFileSync(FILE_PATH, JSON.stringify({}), 'utf-8');
+    }
+    if (!fs.existsSync(PARTY_FILE_PATH)) {
+      fs.writeFileSync(PARTY_FILE_PATH, JSON.stringify([]), 'utf-8');
+    }
 
+    let partyRegistry = [];
 
-      // // 1. Setup the base data directory
-      // const appDataFolder = path.join(userDataPath, 'appdata');
-      // if (!fs.existsSync(appDataFolder)) {
-      //   fs.mkdirSync(appDataFolder, { recursive: true });
-      // }
-
-      // 2. Setup the reports directory
-      REPORTS_FOLDER_PATH = path.join(userDataPath, 'reports');
-      if (!fs.existsSync(REPORTS_FOLDER_PATH)) {
-        fs.mkdirSync(REPORTS_FOLDER_PATH, { recursive: true });
-      }
-
-
-
-
-      FILE_PATH = path.join(userDataPath, 'users.json');
-      PARTY_FILE_PATH = path.join(userDataPath, 'parties.json');
-
-
-      // // 2. Create the folder if it doesn't exist
-      // if (!fs.existsSync(REPORTS_FOLDER_PATH)) {
-      //   fs.mkdirSync(REPORTS_FOLDER_PATH, { recursive: true });
-      // }
-
-      // 3. Initialize the files in the safe directory if they don't exist yet
-      if (!fs.existsSync(FILE_PATH)) {
-        fs.writeFileSync(FILE_PATH, JSON.stringify({}), 'utf-8');
-      }
-      if (!fs.existsSync(PARTY_FILE_PATH)) {
-        fs.writeFileSync(PARTY_FILE_PATH, JSON.stringify([]), 'utf-8');
-      }
-
-      // 4. Now that the paths are ready, trigger your initial data load/UI render functions
-      if (fs.existsSync(PARTY_FILE_PATH)) {
-        try {
-          partyRegistry = JSON.parse(fs.readFileSync(PARTY_FILE_PATH, 'utf-8'));
-        } catch (e) {
-          partyRegistry = [];
-        }
-      }
-
-      // Call your UI initialization function here if you have one (e.g., renderPartyUI(partyRegistry);)
-
-    }).catch(err => {
-      console.error("Failed to resolve writeable path:", err);
-    });
+    // 5. Load your storage records into memory instantly
+    partyRegistry = []; // <-- Removed 'let' so it just updates the existing variable
+    try {
+      partyRegistry = JSON.parse(fs.readFileSync(PARTY_FILE_PATH, 'utf-8'));
+    } catch (e) {
+      partyRegistry = [];
+    }
 
 
 
@@ -764,188 +722,379 @@
     if (!fs.existsSync(PARTY_FILE_PATH)) fs.writeFileSync(PARTY_FILE_PATH, JSON.stringify([]), 'utf-8');
 
 
+    // async function openReport() {
+    //   const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
+    //   // ipcRenderer.send("open-report-window", { customerName: `${party.firstName} ${party.lastName}` });
+
+    //   // 1. Generate CSV File content based on Incoming/Outgoing screen context
+    //   let csvContent = "";
+    //   if (activeDirectionSelectionString === "Incoming") {
+    //     csvContent += "Sr. No.,Item Name,Date,Weight (g),Tunch (%),Waste (%),Total Waste (%),Fine (g),Labor (Rs.)\n";
+    //     currentGridRowsArray.forEach((row, i) => {
+    //       const w = Number(row.weight) || 0;
+    //       const t = Number(row.tunch) || 0;
+    //       const wa = Number(row.waste) || 0;
+    //       const l = Number(row.labor) || 0;
+    //       const totalWaste = t + wa;
+    //       const fineVal = w * (totalWaste / 100);
+    //       csvContent += `${i + 1},"${row.itemName || ''}",${row.date || ''},${w},${t},${wa},${totalWaste.toFixed(2)},${fineVal.toFixed(2)},${l}\n`;
+    //     });
+    //   } else {
+    //     csvContent += "Sr. No.,Item Name,Tunch No.,Weight (g),Tunch (%),Fine (g),Date\n";
+    //     currentGridRowsArray.forEach((row, i) => {
+    //       const w = Number(row.weight) || 0;
+    //       const t = Number(row.tunch) || 0;
+    //       const fineVal = w * (t / 100);
+    //       csvContent += `${i + 1},"${row.itemName || ''}","${row.tunchNo || ''}",${w},${t},${fineVal.toFixed(2)},${row.date || ''}\n`;
+    //     });
+    //   }
+
+    //   // 2. Define the default file name suggestion
+    //   const baseFileName = `${party.firstName}_${party.lastName}_${activeDirectionSelectionString}_Report.pdf`;
+
+    //   try {
+    //     // 3. Trigger Windows Default 'Save As' Dialog Popup window 
+    //     const pdfOutputPath = await ipcRenderer.invoke("show-save-dialog", baseFileName);
+
+    //     // If user presses "Cancel", stop execution safely
+    //     if (!pdfOutputPath) {
+    //       console.log("Save operation was cancelled by the user.");
+    //       return;
+    //     }
+
+    //     // Determine the safe folder location and name selected by the user to write matching CSV
+    //     const parsedPath = path.parse(pdfOutputPath);
+    //     const csvOutputPath = path.join(parsedPath.dir, `${parsedPath.name}.csv`);
+
+    //     // 4. Write the CSV directly to the user chosen folder layout path
+    //     fs.writeFileSync(csvOutputPath, csvContent, 'utf-8');
+    //     console.log(`CSV written successfully to: ${csvOutputPath}`);
+
+    //     // 5. Parse the CSV string directly in-memory and forward path to createPDF
+    //     Papa.parse(csvContent, {
+    //       header: true,
+    //       skipEmptyLines: true,
+    //       complete: function (result) {
+    //         if (result.data.length === 0) {
+    //           alert("CSV is empty.");
+    //           return;
+    //         }
+    //         // Generate and save the PDF to the user chosen destination path
+    //         createPDF(result.data, pdfOutputPath);
+    //       },
+    //       error: function (err) {
+    //         console.error(err);
+    //         alert("Failed to process CSV data.");
+    //       }
+    //     });
+
+    //   } catch (error) {
+    //     console.error("File System Error:", error);
+    //     alert("Failed to write report files to disk: " + error.message);
+    //   }
+
+    //   async function createPDF(data, targetPdfPath) {
+    //     const userDataPath = await ipcRenderer.invoke('get-user-data-path');
+    //     const headers = Object.keys(data[0]);
+    //     const rows = data.map(row => headers.map(h => row[h]));
+
+    //     // Calculate Summations
+    //     let totalWeight = 0;
+    //     let totalFine = 0;
+    //     let totalLabor = 0;
+
+    //     data.forEach(row => {
+    //       totalWeight += Number(row['Weight (g)']) || 0;
+    //       totalFine += Number(row['Fine (g)']) || 0;
+    //       if (activeDirectionSelectionString === "Incoming") {
+    //         totalLabor += Number(row['Labor (Rs.)']) || 0;
+    //       }
+    //     });
+
+    //     // Construct the Footer Row array
+    //     let footRow = [];
+    //     if (activeDirectionSelectionString === "Incoming") {
+    //       footRow = [
+    //         "Total",
+    //         "",
+    //         "",
+    //         totalWeight.toFixed(2),
+    //         "",
+    //         "",
+    //         "",
+    //         totalFine.toFixed(2),
+    //         totalLabor.toFixed(2)
+    //       ];
+    //     } else {
+    //       footRow = [
+    //         "Total",
+    //         "",
+    //         "",
+    //         totalWeight.toFixed(2),
+    //         "",
+    //         totalFine.toFixed(2),
+    //         ""
+    //       ];
+    //     }
+
+    //     const doc = new jsPDF({
+    //       orientation: "landscape",
+    //       unit: "mm",
+    //       format: "a4"
+    //     });
+
+    //     doc.setFontSize(18);
+    //     doc.text(`${party.firstName} ${party.lastName} - Report`, 14, 15);
+
+
+
+    //     //set Image
+    //     const logoPngPath = path.join(userDataPath, 'logo.png');
+
+    //     // 2. Add the Logo dynamically in the top-right corner with correct rectangular proportions
+    //     if (fs.existsSync(logoPngPath)) {
+    //       const logoBase64 = "data:image/png;base64," + fs.readFileSync(logoPngPath).toString('base64');
+
+    //       // Adjusted Dimensions: X=145, Y=10, Width=50mm, Height=15mm to fix stretching
+    //       doc.addImage(logoBase64, 'PNG', 244, 12, 37, 10);
+    //     } else {
+    //       console.warn("Logo PNG file was not found at path: ", logoPngPath);
+    //     }
+
+
+
+    //     doc.setFontSize(10);
+
+    //     doc.text(
+    //       "Generated : " + new Date().toLocaleString(),
+    //       14,
+    //       22
+    //     );
+
+    //     doc.autoTable({
+    //       startY: 30,
+    //       head: [headers],
+    //       body: rows,
+    //       foot: [footRow],
+    //       showFoot: 'lastPage',
+    //       theme: "grid",
+    //       headStyles: {
+    //         fillColor: [41, 128, 185],
+    //         textColor: 255
+    //       },
+    //       footStyles: {
+    //         fillColor: [52, 73, 94],
+    //         textColor: 255,
+    //         fontStyle: 'bold'
+    //       },
+    //       alternateRowStyles: {
+    //         fillColor: [245, 245, 245]
+    //       },
+    //       styles: {
+    //         fontSize: 9,
+    //         cellPadding: 2
+    //       }
+    //     });
+
+    //     // Saves the structured PDF straight to the verified Windows dialog file string
+    //     doc.save(targetPdfPath);
+    //     console.log(`PDF saved successfully to: ${targetPdfPath}`);
+
+    //     // Call your layout notification banner alert
+    //     printSuccessToast();
+    //   }
+    // }
+
+    // async function openReport() {
+    //   const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
+
+    //   // 1. Generate CSV File content
+    //   let csvContent = "";
+    //   if (activeDirectionSelectionString === "Incoming") {
+    //     csvContent += "Sr. No.,Item Name,Date,Weight (g),Tunch (%),Waste (%),Total Waste (%),Fine (g),Labor (Rs.),Total Labor Cost\n";
+    //     currentGridRowsArray.forEach((row, i) => {
+    //       const w = Number(row.weight) || 0;
+    //       const t = Number(row.tunch) || 0;
+    //       const wa = Number(row.waste) || 0;
+    //       const l = Number(row.labor) || 0;
+    //       const totalWaste = t + wa;
+    //       const fineVal = w * (totalWaste / 100);
+    //       const rowLaborCost = Number(row.totalLaborCost) || 0;
+
+    //       csvContent += `${i + 1},"${row.itemName || ''}",${row.date || ''},${formatWeightDisplay(w)},${t.toFixed(2)},${wa.toFixed(2)},${totalWaste.toFixed(2)},${formatWeightDisplay(fineVal)},${l.toFixed(2)},${rowLaborCost.toFixed(2)}\n`;
+    //     });
+    //   } else {
+    //     csvContent += "Sr. No.,Item Name,Tunch No.,Weight (g),Tunch (%),Fine (g),Date\n";
+    //     currentGridRowsArray.forEach((row, i) => {
+    //       const w = Number(row.weight) || 0;
+    //       const t = Number(row.tunch) || 0;
+    //       const fineVal = w * (t / 100);
+    //       csvContent += `${i + 1},"${row.itemName || ''}","${row.tunchNo || ''}",${formatWeightDisplay(w)},${t.toFixed(2)},${formatWeightDisplay(fineVal)},${row.date || ''}\n`;
+    //     });
+    //   }
+
+    //   const baseFileName = `${party.firstName}_${party.lastName}_${activeDirectionSelectionString}_Report.pdf`;
+
+    //   try {
+    //     const pdfOutputPath = await ipcRenderer.invoke("show-save-dialog", baseFileName);
+    //     if (!pdfOutputPath) return;
+
+    //     const parsedPath = path.parse(pdfOutputPath);
+    //     const csvOutputPath = path.join(parsedPath.dir, `${parsedPath.name}.csv`);
+    //     //fs.writeFileSync(csvOutputPath, csvContent, 'utf-8');
+
+    //     Papa.parse(csvContent, {
+    //       header: true,
+    //       skipEmptyLines: true,
+    //       complete: function (result) {
+    //         if (result.data.length === 0) { alert("CSV is empty."); return; }
+    //         createPDF(result.data, pdfOutputPath);
+    //       }
+    //     });
+    //   } catch (error) {
+    //     console.error("File System Error:", error);
+    //     alert("Failed to write report: " + error.message);
+    //   }
+
+    //   async function createPDF(data, targetPdfPath) {
+    //     const userDataPath = await ipcRenderer.invoke('get-user-data-path');
+    //     const headers = Object.keys(data[0]);
+    //     const rows = data.map(row => headers.map(h => row[h]));
+
+    //     let totalWeight = 0;
+    //     let totalFine = 0;
+    //     let totalLaborCostSum = 0;
+
+    //     data.forEach(row => {
+    //       // Parsing back from the formatted CSV string
+    //       totalWeight += Number(row['Weight (g)'].replace(/,/g, '')) || 0;
+    //       totalFine += Number(row['Fine (g)'].replace(/,/g, '')) || 0;
+    //       if (activeDirectionSelectionString === "Incoming") {
+    //         totalLaborCostSum += Number(row['Total Labor Cost']) || 0;
+    //       }
+    //     });
+
+    //     let footRow = [];
+    //     if (activeDirectionSelectionString === "Incoming") {
+    //       footRow = [
+    //         "Total", "", "",
+    //         formatWeightDisplay(totalWeight * 1000),
+    //         "", "", "",
+    //         formatWeightDisplay(totalFine * 1000),
+    //         "",
+    //         totalLaborCostSum.toFixed(2)
+    //       ];
+    //     } else {
+    //       footRow = [
+    //         "Total", "", "",
+    //         formatWeightDisplay(totalWeight * 1000),
+    //         "",
+    //         formatWeightDisplay(totalFine * 1000),
+    //         ""
+    //       ];
+    //     }
+
+    //     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+    //     doc.setFontSize(18);
+    //     doc.text(`${party.firstName} ${party.lastName} - Report`, 14, 15);
+
+    //     const logoPngPath = path.join(userDataPath, 'logo.png');
+    //     if (fs.existsSync(logoPngPath)) {
+    //       const logoBase64 = "data:image/png;base64," + fs.readFileSync(logoPngPath).toString('base64');
+    //       doc.addImage(logoBase64, 'PNG', 244, 12, 37, 10);
+    //     }
+
+    //     doc.setFontSize(10);
+    //     doc.text("Generated : " + new Date().toLocaleString(), 14, 22);
+
+    //     doc.autoTable({
+    //       startY: 30,
+    //       head: [headers],
+    //       body: rows,
+    //       foot: [footRow],
+    //       showFoot: 'lastPage',
+    //       theme: "grid",
+    //       headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+    //       footStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' }
+    //     });
+
+    //     //doc.save(targetPdfPath);
+
+    //     // NEW: Open the file in the default system PDF viewer
+    //     shell.openPath(targetPdfPath).then((errorMessage) => {
+    //       if (errorMessage) {
+    //         console.error("Failed to open file:", errorMessage);
+    //       }
+    //     });
+    //     printSuccessToast();
+    //   }
+    // }
+
+
     async function openReport() {
       const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
-      // ipcRenderer.send("open-report-window", { customerName: `${party.firstName} ${party.lastName}` });
+      if (!party) return;
 
-      // 1. Generate CSV File content based on Incoming/Outgoing screen context
-      let csvContent = "";
-      if (activeDirectionSelectionString === "Incoming") {
-        csvContent += "Sr. No.,Item Name,Date,Weight (g),Tunch (%),Waste (%),Total Waste (%),Fine (g),Labor (Rs.)\n";
-        currentGridRowsArray.forEach((row, i) => {
-          const w = Number(row.weight) || 0;
-          const t = Number(row.tunch) || 0;
-          const wa = Number(row.waste) || 0;
-          const l = Number(row.labor) || 0;
+      // 1. Prepare data rows directly from your current data
+      const rows = currentGridRowsArray.map((row, i) => {
+        const w = Number(row.weight) || 0;
+        const t = Number(row.tunch) || 0;
+        const wa = Number(row.waste) || 0;
+        const l = Number(row.labor) || 0;
+
+        if (activeDirectionSelectionString === "Incoming") {
           const totalWaste = t + wa;
           const fineVal = w * (totalWaste / 100);
-          csvContent += `${i + 1},"${row.itemName || ''}",${row.date || ''},${w},${t},${wa},${totalWaste.toFixed(2)},${fineVal.toFixed(2)},${l}\n`;
-        });
-      } else {
-        csvContent += "Sr. No.,Item Name,Tunch No.,Weight (g),Tunch (%),Fine (g),Date\n";
-        currentGridRowsArray.forEach((row, i) => {
-          const w = Number(row.weight) || 0;
-          const t = Number(row.tunch) || 0;
+          return [i + 1, row.itemName || '', row.date || '', formatWeightDisplay(w), t.toFixed(2), wa.toFixed(2), totalWaste.toFixed(2), formatWeightDisplay(fineVal), l.toFixed(2), Number(row.totalLaborCost || 0).toFixed(2)];
+        } else {
           const fineVal = w * (t / 100);
-          csvContent += `${i + 1},"${row.itemName || ''}","${row.tunchNo || ''}",${w},${t},${fineVal.toFixed(2)},${row.date || ''}\n`;
-        });
+          return [i + 1, row.itemName || '', row.tunchNo || '', formatWeightDisplay(w), t.toFixed(2), formatWeightDisplay(fineVal), row.date || ''];
+        }
+      });
+
+      // 2. Generate PDF in memory
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const userDataPath = await ipcRenderer.invoke('get-user-data-path');
+
+      doc.setFontSize(18);
+      doc.text(`${party.firstName} ${party.lastName} - Report`, 14, 15);
+
+      const logoPngPath = path.join(userDataPath, 'logo.png');
+      if (fs.existsSync(logoPngPath)) {
+        const logoBase64 = "data:image/png;base64," + fs.readFileSync(logoPngPath).toString('base64');
+        doc.addImage(logoBase64, 'PNG', 244, 12, 37, 10);
       }
 
-      // 2. Define the default file name suggestion
-      const baseFileName = `${party.firstName}_${party.lastName}_${activeDirectionSelectionString}_Report.pdf`;
+      doc.setFontSize(10);
+      doc.text("Generated : " + new Date().toLocaleString(), 14, 22);
 
-      try {
-        // 3. Trigger Windows Default 'Save As' Dialog Popup window 
-        const pdfOutputPath = await ipcRenderer.invoke("show-save-dialog", baseFileName);
+      const headers = activeDirectionSelectionString === "Incoming"
+        ? ["Sr. No.", "Item Name", "Date", "Weight (g)", "Tunch (%)", "Waste (%)", "Total Waste (%)", "Fine (g)", "Labor (Rs.)", "Total Labor Cost"]
+        : ["Sr. No.", "Item Name", "Tunch No.", "Weight (g)", "Tunch (%)", "Fine (g)", "Date"];
 
-        // If user presses "Cancel", stop execution safely
-        if (!pdfOutputPath) {
-          console.log("Save operation was cancelled by the user.");
-          return;
-        }
+      doc.autoTable({
+        startY: 30,
+        head: [headers],
+        body: rows,
+        theme: "grid",
+        headStyles: { fillColor: [41, 128, 185], textColor: 255 }
+      });
 
-        // Determine the safe folder location and name selected by the user to write matching CSV
-        const parsedPath = path.parse(pdfOutputPath);
-        const csvOutputPath = path.join(parsedPath.dir, `${parsedPath.name}.csv`);
+      // 3. Save to System Temp folder (Auto-managed by OS)
+      const os = require('os');
+      const tempFilePath = path.join(os.tmpdir(), `Report_${Date.now()}.pdf`);
+      doc.save(tempFilePath);
 
-        // 4. Write the CSV directly to the user chosen folder layout path
-        fs.writeFileSync(csvOutputPath, csvContent, 'utf-8');
-        console.log(`CSV written successfully to: ${csvOutputPath}`);
+      // 4. Open in default PDF viewer
+      shell.openPath(tempFilePath).then((errorMessage) => {
+        if (errorMessage) console.error("Failed to open file:", errorMessage);
+      });
 
-        // 5. Parse the CSV string directly in-memory and forward path to createPDF
-        Papa.parse(csvContent, {
-          header: true,
-          skipEmptyLines: true,
-          complete: function (result) {
-            if (result.data.length === 0) {
-              alert("CSV is empty.");
-              return;
-            }
-            // Generate and save the PDF to the user chosen destination path
-            createPDF(result.data, pdfOutputPath);
-          },
-          error: function (err) {
-            console.error(err);
-            alert("Failed to process CSV data.");
-          }
-        });
-
-      } catch (error) {
-        console.error("File System Error:", error);
-        alert("Failed to write report files to disk: " + error.message);
-      }
-
-      async function createPDF(data, targetPdfPath) {
-        const userDataPath = await ipcRenderer.invoke('get-user-data-path');
-        const headers = Object.keys(data[0]);
-        const rows = data.map(row => headers.map(h => row[h]));
-
-        // Calculate Summations
-        let totalWeight = 0;
-        let totalFine = 0;
-        let totalLabor = 0;
-
-        data.forEach(row => {
-          totalWeight += Number(row['Weight (g)']) || 0;
-          totalFine += Number(row['Fine (g)']) || 0;
-          if (activeDirectionSelectionString === "Incoming") {
-            totalLabor += Number(row['Labor (Rs.)']) || 0;
-          }
-        });
-
-        // Construct the Footer Row array
-        let footRow = [];
-        if (activeDirectionSelectionString === "Incoming") {
-          footRow = [
-            "Total",
-            "",
-            "",
-            totalWeight.toFixed(2),
-            "",
-            "",
-            "",
-            totalFine.toFixed(2),
-            totalLabor.toFixed(2)
-          ];
-        } else {
-          footRow = [
-            "Total",
-            "",
-            "",
-            totalWeight.toFixed(2),
-            "",
-            totalFine.toFixed(2),
-            ""
-          ];
-        }
-
-        const doc = new jsPDF({
-          orientation: "landscape",
-          unit: "mm",
-          format: "a4"
-        });
-
-        doc.setFontSize(18);
-        doc.text(`${party.firstName} ${party.lastName} - Report`, 14, 15);
-
-
-
-        //set Image
-        const logoPngPath = path.join(userDataPath, 'logo.png');
-
-        // 2. Add the Logo dynamically in the top-right corner with correct rectangular proportions
-        if (fs.existsSync(logoPngPath)) {
-          const logoBase64 = "data:image/png;base64," + fs.readFileSync(logoPngPath).toString('base64');
-
-          // Adjusted Dimensions: X=145, Y=10, Width=50mm, Height=15mm to fix stretching
-          doc.addImage(logoBase64, 'PNG', 244, 12, 37, 10);
-        } else {
-          console.warn("Logo PNG file was not found at path: ", logoPngPath);
-        }
-
-
-
-        doc.setFontSize(10);
-
-        doc.text(
-          "Generated : " + new Date().toLocaleString(),
-          14,
-          22
-        );
-
-        doc.autoTable({
-          startY: 30,
-          head: [headers],
-          body: rows,
-          foot: [footRow],
-          showFoot: 'lastPage',
-          theme: "grid",
-          headStyles: {
-            fillColor: [41, 128, 185],
-            textColor: 255
-          },
-          footStyles: {
-            fillColor: [52, 73, 94],
-            textColor: 255,
-            fontStyle: 'bold'
-          },
-          alternateRowStyles: {
-            fillColor: [245, 245, 245]
-          },
-          styles: {
-            fontSize: 9,
-            cellPadding: 2
-          }
-        });
-
-        // Saves the structured PDF straight to the verified Windows dialog file string
-        doc.save(targetPdfPath);
-        console.log(`PDF saved successfully to: ${targetPdfPath}`);
-
-        // Call your layout notification banner alert
-        printSuccessToast();
-      }
+      printSuccessToast();
     }
+
+
 
 
     //successfully working code -> to generate the pdf for incoming and outgoing scnreen
@@ -1368,7 +1517,7 @@
       currentGridRowsArray = party[targetStorageKey] || [];
       if (currentGridRowsArray.length === 0) {
         if (activeDirectionSelectionString === "Incoming") {
-          currentGridRowsArray.push({ itemName: '', date: getFormattedTodayDate(), weight: 0, tunch: 0, waste: 0, labor: 0 });
+          currentGridRowsArray.push({ itemName: '', date: getFormattedTodayDate(), weight: 0, tunch: 0, waste: 0, labor: 0, totalLaborCost: 0 });
         } else {
           currentGridRowsArray.push({ itemName: '', tunchNo: '', weight: 0, tunch: 0, date: getFormattedTodayDate() });
         }
@@ -1423,17 +1572,18 @@
         // Enforce solid, unified column sizing boundaries
         tableElement.style.minWidth = "1230px";
         colgroup.innerHTML = `
-      <col style="width: 70px;">
-      <col style="width: 260px;">
-      <col style="width: 160px;">
-      <col style="width: 110px;">
-      <col style="width: 95px;">
-      <col style="width: 95px;">
-      <col style="width: 120px;">
-      <col style="width: 120px;">
-      <col style="width: 120px;">
-      <col style="width: 80px;">
-    `;
+    <col style="width: 70px;">   <!-- Sr. No. -->
+    <col style="width: 260px;">  <!-- Item Name -->
+    <col style="width: 160px;">  <!-- Date -->
+    <col style="width: 110px;">  <!-- Weight -->
+    <col style="width: 95px;">   <!-- Tunch -->
+    <col style="width: 95px;">   <!-- Waste -->
+    <col style="width: 120px;">  <!-- Total Waste -->
+    <col style="width: 120px;">  <!-- Fine -->
+    <col style="width: 120px;">  <!-- Labor Cost/kg -->
+    <col style="width: 120px;">  <!-- Total Labor Cost -->
+    <col style="width: 80px;">   <!-- Action -->
+`;
 
         document.getElementById("grid-footer-colgroup").innerHTML =
           document.getElementById("grid-table-colgroup-injector").innerHTML;
@@ -1448,7 +1598,8 @@
         <th>Waste <span class="text-[9px] opacity-40 font-mono">(%)</span></th>
         <th>Total Waste <span class="text-[9px] opacity-40 font-mono">(%)</span></th>
         <th>Fine <span class="text-[9px] opacity-40 lowercase">(g)</span></th>
-        <th>Labor Cost <span class="text-[9px] opacity-40 lowercase">(₹)</span></th>
+        <th>Labor Cost/kg <span class="text-[9px] opacity-40 lowercase">(₹)</span></th>
+        <th>Total Labor Cost <span class="text-[9px] opacity-40 lowercase">(₹)</span></th>
         <th class="no-print">Action</th>
       </tr>
     `;
@@ -1495,19 +1646,27 @@
           <input type="date" value="${dateVal}" onchange="updateGridTextCell(${i}, 'date', this.value)" class="static-cell-input input input-sm bg-base-300/40 border border-white/5 focus:bg-base-300 text-center focus:outline-none text-primary font-bold rounded-lg px-2" />
         </td>
         <td class="p-1">
-          <input type="number" step="any" min="0" value="${row.weight}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'weight',0);}" oninput="updateGridNumericCell(${i}, 'weight', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-white font-bold" />
-        </td>
+  <input type="text" 
+    value="${formatWeightDisplay(row.weight)}" 
+    onfocus="this.value = currentGridRowsArray[${i}].weight == 0 ? '' : currentGridRowsArray[${i}].weight;" 
+    onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'weight',0);} this.value = formatWeightDisplay(currentGridRowsArray[${i}].weight);" 
+    oninput="updateGridNumericCell(${i}, 'weight', this.value)" 
+    class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-white font-bold" />
+</td>
         <td class="p-1">
-          <input type="number" step="any" min="0" value="${row.tunch}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'tunch',0);}" oninput="updateGridNumericCell(${i}, 'tunch', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-warning font-bold" />
+          <input type="number" step="any" min="0" value="${row.tunch.toFixed(2)}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'tunch',0);}" oninput="updateGridNumericCell(${i}, 'tunch', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-warning font-bold" />
         </td>
         <td class="p-1">
           <input type="number" step="any" min="0" value="${row.waste}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'waste',0);}" oninput="updateGridNumericCell(${i}, 'waste', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-secondary font-bold" />
         </td>
         <td id="calc-totalwaste-${i}" class="font-bold text-info bg-base-900/10 font-mono text-center">${totalWaste.toFixed(2)}%</td>
-        <td id="calc-fine-${i}" class="font-bold text-success bg-base-900/10 font-mono text-center">${fineVal.toFixed(2)}</td>
+       <td id="calc-fine-${i}" class="font-bold text-success bg-base-900/10 font-mono text-center">${formatWeightDisplay(fineVal)}</td>
         <td class="p-1">
           <input type="number" step="any" min="0" value="${row.labor}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'labor',0);}" oninput="updateGridNumericCell(${i}, 'labor', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-accent font-bold" placeholder="0" />
         </td>
+<td id="calc-total-labor-${i}" class="font-bold text-accent bg-base-900/10 font-mono text-center">
+  ${((parseFloat(row.labor) || 0) * (parseFloat(row.weight) || 0) / 1000).toFixed(2)}
+</td>
         <td class="p-0 text-center no-print">
           <button onclick="removeMetricDataRow(${i})" class="btn btn-ghost btn-xs btn-square text-error/60 hover:text-error hover:bg-error/10 rounded-lg">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -1528,7 +1687,8 @@
         <td></td>
         <td></td>
         <td id="sum-fine" class="text-success font-mono font-black text-center text-sm">0.00</td>
-        <td id="sum-labor" class="text-accent font-mono font-black text-center text-sm">₹0.00</td>
+        <td></td>
+        <td id="sum-total-labor-cost" class="text-accent font-mono font-black text-center text-sm">₹0.00</td>
         <td class="no-print"></td>
       </tr>
     `;
@@ -1602,12 +1762,17 @@
           <input type="text" value="${tunchNoVal}" oninput="updateGridTextCell(${i}, 'tunchNo', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-info font-bold" placeholder="—" />
         </td>
         <td class="p-1">
-          <input type="number" step="any" min="0" value="${row.weight}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'weight',0);}" oninput="updateGridNumericCell(${i}, 'weight', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-white font-bold" />
-        </td>
+  <input type="text" 
+    value="${formatWeightDisplay(row.weight)}" 
+    onfocus="this.value = currentGridRowsArray[${i}].weight == 0 ? '' : currentGridRowsArray[${i}].weight;" 
+    onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'weight',0);} this.value = formatWeightDisplay(currentGridRowsArray[${i}].weight);" 
+    oninput="updateGridNumericCell(${i}, 'weight', this.value)" 
+    class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-white font-bold" />
+</td>
         <td class="p-1">
           <input type="number" step="any" min="0" value="${row.tunch}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'tunch',0);}" oninput="updateGridNumericCell(${i}, 'tunch', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-warning font-bold" />
         </td>
-        <td id="calc-fine-${i}" class="font-bold text-success bg-base-900/10 font-mono text-center">${fineVal.toFixed(2)}</td>
+        <td id="calc-fine-${i}" class="font-bold text-success bg-base-900/10 font-mono text-center">${formatWeightDisplay(fineVal)}</td>
         <td class="p-1 text-center">
           <input type="date" value="${dateVal}" onchange="updateGridTextCell(${i}, 'date', this.value)" class="static-cell-input input input-sm bg-base-300/40 border border-white/5 focus:bg-base-300 text-center focus:outline-none text-primary font-bold rounded-lg px-2" />
         </td>
@@ -1666,12 +1831,22 @@
 
       const w = currentGridRowsArray[index].weight || 0;
       const t = currentGridRowsArray[index].tunch || 0;
+      const l = currentGridRowsArray[index].labor || 0;
 
+      // Calculate row-specific values
       let fineCalculated = 0;
+      let totalLaborRowCost = 0; // Local variable
+
       if (activeDirectionSelectionString === "Incoming") {
         const wa = currentGridRowsArray[index].waste || 0;
         const totalWaste = t + wa;
         fineCalculated = w * (totalWaste / 100);
+
+        // Calculate total cost for this specific row
+        totalLaborRowCost = (l * w) / 1000;
+
+        // CRITICAL: Save to the array so calculateMatrixColumnTotals() can see it
+        currentGridRowsArray[index].totalLaborCost = totalLaborRowCost;
 
         const twEl = document.getElementById(`calc-totalwaste-${index}`);
         if (twEl) twEl.innerText = `${totalWaste.toFixed(2)}%`;
@@ -1679,8 +1854,14 @@
         fineCalculated = w * (t / 100);
       }
 
+      // Update DOM for row
       const fEl = document.getElementById(`calc-fine-${index}`);
-      if (fEl) fEl.innerText = `${fineCalculated.toFixed(2)}`;
+      if (fEl) fEl.innerText = formatWeightDisplay(fineCalculated);
+
+      const tlEl = document.getElementById(`calc-total-labor-${index}`);
+      if (tlEl) {
+        tlEl.innerText = totalLaborRowCost.toFixed(2);
+      }
 
       calculateMatrixColumnTotals();
     }
@@ -1688,7 +1869,8 @@
     function calculateMatrixColumnTotals() {
       let totalWeight = 0;
       let totalFine = 0;
-      let totalLabor = 0;
+      let totalLaborRate = 0; // Tracks the rate (₹/kg)
+      let totalLaborCost = 0; // New: Tracks the sum of all row costs
 
       currentGridRowsArray.forEach(row => {
         const w = Number(row.weight) || 0;
@@ -1698,20 +1880,27 @@
         if (activeDirectionSelectionString === "Incoming") {
           const wa = Number(row.waste) || 0;
           const l = Number(row.labor) || 0;
+          const rowTotalLabor = Number(row.totalLaborCost) || 0; // Ensure this property exists in your row object
+
           totalFine += w * ((t + wa) / 100);
-          totalLabor += l;
+          totalLaborRate += l;
+          totalLaborCost += rowTotalLabor; // Accumulate the total cost
         } else {
           totalFine += w * (t / 100);
         }
       });
 
+      // Select elements
       const weightEl = document.getElementById('sum-weight');
       const fineEl = document.getElementById('sum-fine');
       const laborEl = document.getElementById('sum-labor');
+      const totalCostEl = document.getElementById('sum-total-labor-cost'); // Ensure this ID exists in your footer
 
-      if (weightEl) weightEl.innerText = totalWeight.toFixed(2);
-      if (fineEl) fineEl.innerText = totalFine.toFixed(2);
-      if (laborEl) laborEl.innerText = `₹${totalLabor.toFixed(2)}`;
+      // Update DOM
+      if (weightEl) weightEl.innerText = formatWeightDisplay(totalWeight.toFixed(2));
+      if (fineEl) fineEl.innerText = formatWeightDisplay(totalFine.toFixed(2));
+      if (laborEl) laborEl.innerText = `₹${totalLaborRate.toFixed(2)}`;
+      if (totalCostEl) totalCostEl.innerText = `₹${totalLaborCost.toFixed(2)}`; // New total
     }
 
     function addMetricDataRow() {
@@ -2046,6 +2235,16 @@
       document.getElementById('party-last').value = '';
       document.getElementById('edit-party-id').value = '';
       document.getElementById('party-modal').close();
+    }
+
+    function formatWeightDisplay(val) {
+      if (val === 0 || val === '0' || !val) return '0';
+
+      // Convert to a whole number string (removing any decimal points)
+      let wholeNumber = Math.round(parseFloat(val)).toString();
+
+      // Add commas as thousands separators (e.g., 1000 -> 1,000)
+      return wholeNumber.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
     }
   </script>
 </body>
