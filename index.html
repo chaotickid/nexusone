@@ -1050,11 +1050,136 @@
     // }
 
 
+    // async function openReport() {
+    //   const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
+    //   if (!party) return;
+
+    //   // 1. Calculate Summary Totals
+    //   let totalWeight = 0;
+    //   let totalFine = 0;
+    //   let totalLaborCostSum = 0;
+
+    //   // 2. Prepare Data Rows and Compute Summations directly
+    //   const rows = currentGridRowsArray.map((row, i) => {
+    //     const w = Number(row.weight) || 0;
+    //     const t = Number(row.tunch) || 0;
+    //     const wa = Number(row.waste) || 0;
+    //     const l = Number(row.labor) || 0;
+
+    //     totalWeight += w;
+
+    //     if (activeDirectionSelectionString === "Incoming") {
+    //       const totalWaste = t + wa;
+    //       const fineVal = w * (totalWaste / 100);
+    //       const rowLaborCost = Number(row.totalLaborCost) || 0;
+
+    //       totalFine += fineVal;
+    //       totalLaborCostSum += rowLaborCost;
+
+    //       return [
+    //         i + 1,
+    //         row.itemName || '',
+    //         row.date || '',
+    //         formatWeightDisplay(w),
+    //         t.toFixed(2),
+    //         wa.toFixed(2),
+    //         totalWaste.toFixed(2),
+    //         formatWeightDisplay(fineVal),
+    //         l.toFixed(2),
+    //         rowLaborCost.toFixed(2)
+    //       ];
+    //     } else {
+    //       const fineVal = w * (t / 100);
+    //       totalFine += fineVal;
+
+    //       return [
+    //         i + 1,
+    //         row.itemName || '',
+    //         row.tunchNo || '',
+    //         formatWeightDisplay(w),
+    //         t.toFixed(2),
+    //         formatWeightDisplay(fineVal),
+    //         row.date || ''
+    //       ];
+    //     }
+    //   });
+
+    //   // 3. Construct the Footer Row Array matching column counts
+    //   let footRow = [];
+    //   if (activeDirectionSelectionString === "Incoming") {
+    //     footRow = [
+    //       "Total",
+    //       "",
+    //       "",
+    //       formatWeightDisplay(totalWeight),
+    //       "",
+    //       "",
+    //       "",
+    //       formatWeightDisplay(totalFine),
+    //       "",
+    //       totalLaborCostSum.toFixed(2)
+    //     ];
+    //   } else {
+    //     footRow = [
+    //       "Total",
+    //       "",
+    //       "",
+    //       formatWeightDisplay(totalWeight),
+    //       "",
+    //       formatWeightDisplay(totalFine),
+    //       ""
+    //     ];
+    //   }
+
+    //   // 4. Generate PDF in memory using jsPDF
+    //   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    //   const userDataPath = await ipcRenderer.invoke('get-user-data-path');
+
+    //   doc.setFontSize(18);
+    //   doc.text(`${party.firstName} ${party.lastName} - Report`, 14, 15);
+
+    //   const logoPngPath = path.join(userDataPath, 'logo.png');
+    //   if (fs.existsSync(logoPngPath)) {
+    //     const logoBase64 = "data:image/png;base64," + fs.readFileSync(logoPngPath).toString('base64');
+    //     doc.addImage(logoBase64, 'PNG', 244, 12, 37, 10);
+    //   }
+
+    //   doc.setFontSize(10);
+    //   doc.text("Generated : " + new Date().toLocaleString(), 14, 22);
+
+    //   const headers = activeDirectionSelectionString === "Incoming"
+    //     ? ["Sr. No.", "Item Name", "Date", "Weight (g)", "Tunch (%)", "Waste (%)", "Total Waste (%)", "Fine (g)", "Labor (Rs.)", "Total Labor Cost"]
+    //     : ["Sr. No.", "Item Name", "Tunch No.", "Weight (g)", "Tunch (%)", "Fine (g)", "Date"];
+
+    //   // 5. Render AutoTable with foot row enabled
+    //   doc.autoTable({
+    //     startY: 30,
+    //     head: [headers],
+    //     body: rows,
+    //     foot: [footRow],
+    //     showFoot: 'lastPage',
+    //     theme: "grid",
+    //     headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+    //     footStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' }
+    //   });
+
+    //   // 6. Save PDF to system temp folder and launch PDF viewer
+    //   const os = require('os');
+    //   const tempFilePath = path.join(os.tmpdir(), `Report_${Date.now()}.pdf`);
+    //   doc.save(tempFilePath);
+
+    //   shell.openPath(tempFilePath).then((errorMessage) => {
+    //     if (errorMessage) console.error("Failed to open file:", errorMessage);
+    //   });
+
+    //   printSuccessToast();
+    // }
+
     async function openReport() {
       const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
       if (!party) return;
 
-      // 1. Calculate Summary Totals
+      // 1. Calculate Summary Totals for current table
       let totalWeight = 0;
       let totalFine = 0;
       let totalLaborCostSum = 0;
@@ -1136,7 +1261,7 @@
       const userDataPath = await ipcRenderer.invoke('get-user-data-path');
 
       doc.setFontSize(18);
-      doc.text(`${party.firstName} ${party.lastName} - Report`, 14, 15);
+      doc.text(`${party.firstName} ${party.lastName} - Report (${activeDirectionSelectionString})`, 14, 15);
 
       const logoPngPath = path.join(userDataPath, 'logo.png');
       if (fs.existsSync(logoPngPath)) {
@@ -1147,13 +1272,99 @@
       doc.setFontSize(10);
       doc.text("Generated : " + new Date().toLocaleString(), 14, 22);
 
+      // 5. Dynamic Table Start Y position
+      let autoTableStartY = 30;
+
+      // 6. IF OUTGOING: Calculate and render Incoming Metrics Summary above the table
+      if (activeDirectionSelectionString === "Outgoing") {
+        const incomingStorageKey = `metricsGridData_${activeTierSelectionString}_Incoming`;
+        const incomingData = party[incomingStorageKey] || [];
+
+        let incWeight = 0;
+        let incFine = 0;
+        let incLabor = 0;
+
+        incomingData.forEach(row => {
+          const w = Number(row.weight) || 0;
+          const t = Number(row.tunch) || 0;
+          const wa = Number(row.waste) || 0;
+          const l = Number(row.labor) || 0;
+
+          incWeight += w;
+          incFine += w * ((t + wa) / 100);
+          incLabor += (l * w) / 1000;
+        });
+
+        // --- BEAUTIFIED INCOMING SUMMARY CARD ---
+        const cardX = 14;
+        const cardY = 26;
+        const cardWidth = 269; // Full width aligned with page margins
+        const cardHeight = 16;
+
+        // 1. Card Container (Soft Background & Slate Border)
+        doc.setFillColor(248, 250, 252); // Very light grey/blue slate background
+        doc.setDrawColor(226, 232, 240); // Subtle slate border
+        doc.setLineWidth(0.3);
+        doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 2, 2, "FD");
+
+        // 2. Left Accent Indicator Line (Primary Blue Accent)
+        doc.setFillColor(41, 128, 185);
+        doc.roundedRect(cardX, cardY, 3, cardHeight, 1, 1, "F");
+
+        // 3. Section Title Badge
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 41, 59);
+        doc.text("INCOMING SUMMARY", cardX + 8, cardY + 10.5);
+
+        // Vertical Divider Line after Title
+        doc.setDrawColor(203, 213, 225);
+        doc.line(cardX + 60, cardY + 3, cardX + 60, cardY + 13);
+
+        // 4. Metric 1: Total Weight
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 116, 139);
+        doc.text("TOTAL WEIGHT", cardX + 68, cardY + 6.5);
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text(`${formatWeightDisplay(incWeight)} g`, cardX + 68, cardY + 12);
+
+        // 5. Metric 2: Total Fine
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 116, 139);
+        doc.text("TOTAL FINE", cardX + 135, cardY + 6.5);
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text(`${formatWeightDisplay(incFine)} g`, cardX + 135, cardY + 12);
+
+        // 6. Metric 3: Total Labor Cost
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(100, 116, 139);
+        doc.text("TOTAL LABOR COST", cardX + 200, cardY + 6.5);
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(16, 185, 129); // Emerald green for cost/amount
+        doc.text(`Rs. ${incLabor.toFixed(2)}`, cardX + 200, cardY + 12);
+
+        // Push down the table below this enhanced card
+        autoTableStartY = 47;
+      }
+
       const headers = activeDirectionSelectionString === "Incoming"
         ? ["Sr. No.", "Item Name", "Date", "Weight (g)", "Tunch (%)", "Waste (%)", "Total Waste (%)", "Fine (g)", "Labor (Rs.)", "Total Labor Cost"]
         : ["Sr. No.", "Item Name", "Tunch No.", "Weight (g)", "Tunch (%)", "Fine (g)", "Date"];
 
-      // 5. Render AutoTable with foot row enabled
+      // 7. Render AutoTable with foot row enabled
       doc.autoTable({
-        startY: 30,
+        startY: autoTableStartY,
         head: [headers],
         body: rows,
         foot: [footRow],
@@ -1163,7 +1374,7 @@
         footStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' }
       });
 
-      // 6. Save PDF to system temp folder and launch PDF viewer
+      // 8. Save PDF to system temp folder and launch PDF viewer
       const os = require('os');
       const tempFilePath = path.join(os.tmpdir(), `Report_${Date.now()}.pdf`);
       doc.save(tempFilePath);
@@ -1951,40 +2162,85 @@
     }
 
     function calculateMatrixColumnTotals() {
-      let totalWeight = 0;
-      let totalFine = 0;
-      let totalLaborRate = 0; // Tracks the rate (₹/kg)
-      let totalLaborCost = 0; // New: Tracks the sum of all row costs
+      const currentParty = partyRegistry.find(p => p.id == currentSelectedPartyId);
 
-      currentGridRowsArray.forEach(row => {
+      // -------------------------------------------------------------
+      // 1. CALCULATE INCOMING TOTALS (For Header Cards)
+      // -------------------------------------------------------------
+      let incomingData = [];
+
+      if (activeDirectionSelectionString === "Incoming") {
+        incomingData = currentGridRowsArray || [];
+      } else if (currentParty) {
+        // If on Outgoing screen, fetch Incoming data from the party object
+        const incomingStorageKey = `metricsGridData_${activeTierSelectionString}_Incoming`;
+        incomingData = currentParty[incomingStorageKey] || [];
+      }
+
+      let incTotalWeight = 0;
+      let incTotalFine = 0;
+      let incTotalLaborCost = 0;
+
+      incomingData.forEach(row => {
         const w = Number(row.weight) || 0;
         const t = Number(row.tunch) || 0;
-        totalWeight += w;
+        const wa = Number(row.waste) || 0;
+        const l = Number(row.labor) || 0;
+
+        incTotalWeight += w;
+        const fineVal = w * ((t + wa) / 100);
+        const rowLaborCost = (l * w) / 1000;
+
+        incTotalFine += fineVal;
+        incTotalLaborCost += rowLaborCost;
+      });
+
+      // Always update Top Header Cards with Incoming Totals
+      const headerWeight = document.getElementById('header-total-weight');
+      const headerFine = document.getElementById('header-total-fine');
+      const headerLabor = document.getElementById('header-total-labor');
+
+      if (headerWeight) headerWeight.innerText = formatWeightDisplay(incTotalWeight);
+      if (headerFine) headerFine.innerText = formatWeightDisplay(incTotalFine);
+      if (headerLabor) headerLabor.innerText = `₹${incTotalLaborCost.toFixed(2)}`;
+
+
+      // -------------------------------------------------------------
+      // 2. CALCULATE ACTIVE SCREEN TOTALS (For Table Footer)
+      // -------------------------------------------------------------
+      let footerTotalWeight = 0;
+      let footerTotalFine = 0;
+
+      // Uses current grid rows (which contains Outgoing rows when on Outgoing view)
+      (currentGridRowsArray || []).forEach(row => {
+        const w = Number(row.weight) || 0;
+        const t = Number(row.tunch) || 0;
+
+        footerTotalWeight += w;
 
         if (activeDirectionSelectionString === "Incoming") {
           const wa = Number(row.waste) || 0;
-          const l = Number(row.labor) || 0;
-          const rowTotalLabor = Number(row.totalLaborCost) || 0; // Ensure this property exists in your row object
-
-          totalFine += w * ((t + wa) / 100);
-          totalLaborRate += l;
-          totalLaborCost += rowTotalLabor; // Accumulate the total cost
+          footerTotalFine += w * ((t + wa) / 100);
         } else {
-          totalFine += w * (t / 100);
+          // Outgoing Fine calculation (Weight * Tunch / 100)
+          footerTotalFine += w * (t / 100);
         }
       });
 
-      // Select elements
-      const weightEl = document.getElementById('sum-weight');
-      const fineEl = document.getElementById('sum-fine');
-      const laborEl = document.getElementById('sum-labor');
-      const totalCostEl = document.getElementById('sum-total-labor-cost'); // Ensure this ID exists in your footer
+      // Update Table Footer with Current Screen (Incoming or Outgoing) Totals
+      const sumWeight = document.getElementById('sum-weight');
+      const sumFine = document.getElementById('sum-fine');
+      const sumLabor = document.getElementById('sum-total-labor-cost');
 
-      // Update DOM
-      if (weightEl) weightEl.innerText = formatWeightDisplay(totalWeight.toFixed(2));
-      if (fineEl) fineEl.innerText = formatWeightDisplay(totalFine.toFixed(2));
-      if (laborEl) laborEl.innerText = `₹${totalLaborRate.toFixed(2)}`;
-      if (totalCostEl) totalCostEl.innerText = `₹${totalLaborCost.toFixed(2)}`; // New total
+      if (sumWeight) sumWeight.innerText = formatWeightDisplay(footerTotalWeight);
+      if (sumFine) sumFine.innerText = formatWeightDisplay(footerTotalFine);
+
+      // If Outgoing table doesn't have labor cost, show current view's labor total or clear it
+      if (sumLabor) {
+        sumLabor.innerText = activeDirectionSelectionString === "Incoming"
+          ? `₹${incTotalLaborCost.toFixed(2)}`
+          : '—';
+      }
     }
 
     function addMetricDataRow() {
