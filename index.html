@@ -542,6 +542,9 @@
         </button>
       </div>
 
+
+      <!-- //asdasdasdasdasdasd -->
+
     </div>
 
     <!-- MAIN CORE TABLECONTAINER WITH INTEGRATED COLGROUP ALIGNMENT -->
@@ -556,6 +559,21 @@
 
     <div
       class="flex-grow flex flex-col border border-white/5 bg-base-300/20 backdrop-blur-md rounded-2xl overflow-hidden">
+
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="bg-base-900/50 p-4 rounded-lg border border-white/10">
+          <p class="text-[10px] text-white/50 uppercase tracking-widest">Total Weight</p>
+          <h3 id="header-total-weight" class="text-xl font-mono font-bold text-white">0.000</h3>
+        </div>
+        <div class="bg-base-900/50 p-4 rounded-lg border border-white/10">
+          <p class="text-[10px] text-white/50 uppercase tracking-widest">Total Fine</p>
+          <h3 id="header-total-fine" class="text-xl font-mono font-bold text-success">0.000</h3>
+        </div>
+        <div class="bg-base-900/50 p-4 rounded-lg border border-white/10">
+          <p class="text-[10px] text-white/50 uppercase tracking-widest">Total Labor Cost</p>
+          <h3 id="header-total-labor" class="text-xl font-mono font-bold text-accent">₹0.00</h3>
+        </div>
+      </div>
 
       <!-- Scrollable Table -->
       <div class="overflow-auto flex-grow">
@@ -1036,24 +1054,84 @@
       const party = partyRegistry.find(p => p.id == currentSelectedPartyId);
       if (!party) return;
 
-      // 1. Prepare data rows directly from your current data
+      // 1. Calculate Summary Totals
+      let totalWeight = 0;
+      let totalFine = 0;
+      let totalLaborCostSum = 0;
+
+      // 2. Prepare Data Rows and Compute Summations directly
       const rows = currentGridRowsArray.map((row, i) => {
         const w = Number(row.weight) || 0;
         const t = Number(row.tunch) || 0;
         const wa = Number(row.waste) || 0;
         const l = Number(row.labor) || 0;
 
+        totalWeight += w;
+
         if (activeDirectionSelectionString === "Incoming") {
           const totalWaste = t + wa;
           const fineVal = w * (totalWaste / 100);
-          return [i + 1, row.itemName || '', row.date || '', formatWeightDisplay(w), t.toFixed(2), wa.toFixed(2), totalWaste.toFixed(2), formatWeightDisplay(fineVal), l.toFixed(2), Number(row.totalLaborCost || 0).toFixed(2)];
+          const rowLaborCost = Number(row.totalLaborCost) || 0;
+
+          totalFine += fineVal;
+          totalLaborCostSum += rowLaborCost;
+
+          return [
+            i + 1,
+            row.itemName || '',
+            row.date || '',
+            formatWeightDisplay(w),
+            t.toFixed(2),
+            wa.toFixed(2),
+            totalWaste.toFixed(2),
+            formatWeightDisplay(fineVal),
+            l.toFixed(2),
+            rowLaborCost.toFixed(2)
+          ];
         } else {
           const fineVal = w * (t / 100);
-          return [i + 1, row.itemName || '', row.tunchNo || '', formatWeightDisplay(w), t.toFixed(2), formatWeightDisplay(fineVal), row.date || ''];
+          totalFine += fineVal;
+
+          return [
+            i + 1,
+            row.itemName || '',
+            row.tunchNo || '',
+            formatWeightDisplay(w),
+            t.toFixed(2),
+            formatWeightDisplay(fineVal),
+            row.date || ''
+          ];
         }
       });
 
-      // 2. Generate PDF in memory
+      // 3. Construct the Footer Row Array matching column counts
+      let footRow = [];
+      if (activeDirectionSelectionString === "Incoming") {
+        footRow = [
+          "Total",
+          "",
+          "",
+          formatWeightDisplay(totalWeight),
+          "",
+          "",
+          "",
+          formatWeightDisplay(totalFine),
+          "",
+          totalLaborCostSum.toFixed(2)
+        ];
+      } else {
+        footRow = [
+          "Total",
+          "",
+          "",
+          formatWeightDisplay(totalWeight),
+          "",
+          formatWeightDisplay(totalFine),
+          ""
+        ];
+      }
+
+      // 4. Generate PDF in memory using jsPDF
       const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const userDataPath = await ipcRenderer.invoke('get-user-data-path');
 
@@ -1073,20 +1151,23 @@
         ? ["Sr. No.", "Item Name", "Date", "Weight (g)", "Tunch (%)", "Waste (%)", "Total Waste (%)", "Fine (g)", "Labor (Rs.)", "Total Labor Cost"]
         : ["Sr. No.", "Item Name", "Tunch No.", "Weight (g)", "Tunch (%)", "Fine (g)", "Date"];
 
+      // 5. Render AutoTable with foot row enabled
       doc.autoTable({
         startY: 30,
         head: [headers],
         body: rows,
+        foot: [footRow],
+        showFoot: 'lastPage',
         theme: "grid",
-        headStyles: { fillColor: [41, 128, 185], textColor: 255 }
+        headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+        footStyles: { fillColor: [52, 73, 94], textColor: 255, fontStyle: 'bold' }
       });
 
-      // 3. Save to System Temp folder (Auto-managed by OS)
+      // 6. Save PDF to system temp folder and launch PDF viewer
       const os = require('os');
       const tempFilePath = path.join(os.tmpdir(), `Report_${Date.now()}.pdf`);
       doc.save(tempFilePath);
 
-      // 4. Open in default PDF viewer
       shell.openPath(tempFilePath).then((errorMessage) => {
         if (errorMessage) console.error("Failed to open file:", errorMessage);
       });
@@ -1654,7 +1735,7 @@
     class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-white font-bold" />
 </td>
         <td class="p-1">
-          <input type="number" step="any" min="0" value="${row.tunch.toFixed(2)}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'tunch',0);}" oninput="updateGridNumericCell(${i}, 'tunch', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-warning font-bold" />
+          <input type="number" step="any" min="0" value="${(Number(row.tunch) || 0).toFixed(2)}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'tunch',0);}" oninput="updateGridNumericCell(${i}, 'tunch', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-warning font-bold" />
         </td>
         <td class="p-1">
           <input type="number" step="any" min="0" value="${row.waste}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'waste',0);}" oninput="updateGridNumericCell(${i}, 'waste', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-secondary font-bold" />
@@ -1770,7 +1851,7 @@
     class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-white font-bold" />
 </td>
         <td class="p-1">
-          <input type="number" step="any" min="0" value="${row.tunch}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'tunch',0);}" oninput="updateGridNumericCell(${i}, 'tunch', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-warning font-bold" />
+          <input type="number" step="any" min="0" value="${(Number(row.tunch) || 0).toFixed(2)}" onfocus="if(this.value == 0) this.value='';" onblur="if(this.value==='') {this.value=0; updateGridNumericCell(${i},'tunch',0);}" oninput="updateGridNumericCell(${i}, 'tunch', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 text-center focus:outline-none text-warning font-bold" />
         </td>
         <td id="calc-fine-${i}" class="font-bold text-success bg-base-900/10 font-mono text-center">${formatWeightDisplay(fineVal)}</td>
         <td class="p-1 text-center">
@@ -1864,6 +1945,9 @@
       }
 
       calculateMatrixColumnTotals();
+
+      // Trigger auto-add check to insert a new row if all details are filled
+      handleAutoAddRow(index);
     }
 
     function calculateMatrixColumnTotals() {
@@ -2246,6 +2330,136 @@
       // Add commas as thousands separators (e.g., 1000 -> 1,000)
       return wholeNumber.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
     }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      calculateMatrixColumnTotals();
+    });
+
+    function evaluateAndShowIncomingTotals(partyData) {
+      if (!partyData) return;
+
+      // Retrieve incoming records (fallback to empty array if none)
+      const incomingRows = partyData.incomingRows || partyData.incoming || [];
+
+      let totalWeight = 0;
+      let totalFine = 0;
+      let totalLaborCost = 0;
+
+      // Calculate totals across all incoming entries
+      incomingRows.forEach(row => {
+        const weight = Number(row.weight) || 0;
+        const tunch = Number(row.tunch) || 0;
+        const waste = Number(row.waste) || 0;
+
+        totalWeight += weight;
+
+        // Fine = weight * ((tunch + waste) / 100)
+        const fine = weight * ((tunch + waste) / 100);
+        totalFine += fine;
+
+        // Labor cost sum
+        const labor = Number(row.totalLaborCost) || Number(row.labor) || 0;
+        totalLaborCost += labor;
+      });
+
+      // Target HTML Card Elements
+      const weightEl = document.getElementById('header-total-weight');
+      const fineEl = document.getElementById('header-total-fine');
+      const laborEl = document.getElementById('header-total-labor');
+
+      // Safely update values
+      if (weightEl) {
+        weightEl.textContent = typeof formatWeightDisplay === 'function'
+          ? formatWeightDisplay(totalWeight)
+          : totalWeight.toFixed(3);
+      }
+
+      if (fineEl) {
+        fineEl.textContent = typeof formatWeightDisplay === 'function'
+          ? formatWeightDisplay(totalFine)
+          : totalFine.toFixed(3);
+      }
+
+      if (laborEl) {
+        laborEl.textContent = `₹${totalLaborCost.toFixed(2)}`;
+      }
+    }
+
+    function loadPartyView(partyId) {
+      // Save ID globally if needed elsewhere
+      window.currentSelectedPartyId = partyId;
+
+      // 1. Fetch current party from registry
+      const currentParty = partyRegistry.find(p => p.id == partyId);
+
+      if (currentParty) {
+        // 2. UPDATE TOP CARDS
+        evaluateAndShowIncomingTotals(currentParty);
+
+        // 3. Render table data
+        renderTable();
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Retrieve selected party ID (from global state, URL, or default selection)
+      const partyId = window.currentSelectedPartyId;
+
+      if (partyId) {
+        loadPartyView(partyId);
+      }
+    });
+
+    function onDataSavedOrUpdated() {
+      const currentParty = partyRegistry.find(p => p.id == window.currentSelectedPartyId);
+
+      if (currentParty) {
+        evaluateAndShowIncomingTotals(currentParty); // Recalculate & update top cards
+        renderTable();                               // Refresh table UI
+      }
+    }
+
+    // Checks if the row is complete and adds a new empty row if it's the last one
+    function handleAutoAddRow(rowIndex) {
+      // Only trigger auto-add if the user is editing the absolute last row
+      if (rowIndex !== currentGridRowsArray.length - 1) return;
+
+      const currentRow = currentGridRowsArray[rowIndex];
+
+      let isRowComplete = false;
+
+      if (activeDirectionSelectionString === "Incoming") {
+        // Check if weight, tunch, waste, and labor all have valid values
+        const w = String(currentRow.weight || "").trim();
+        const t = String(currentRow.tunch || "").trim();
+        const wa = String(currentRow.waste || "").trim();
+        const l = String(currentRow.labor || "").trim();
+
+        isRowComplete = w !== "" && t !== "" && wa !== "" && l !== "";
+      } else {
+        // Outgoing screen: Check if weight and tunch have valid values
+        const w = String(currentRow.weight || "").trim();
+        const t = String(currentRow.tunch || "").trim();
+
+        isRowComplete = w !== "" && t !== "";
+      }
+
+      // If all fields in the last row are filled out, push a new blank row
+      if (isRowComplete) {
+        if (activeDirectionSelectionString === "Incoming") {
+          currentGridRowsArray.push({ weight: "", tunch: "", waste: "", labor: "", totalLaborCost: 0 });
+        } else {
+          currentGridRowsArray.push({ weight: "", tunch: "" });
+        }
+
+        // Re-render the grid UI so the new row appears immediately
+        renderMetricsGridUI();
+
+        // Maintain focus on the field the user was typing in
+        // (Optional: You can also focus the first field of the new row if preferred)
+      }
+    }
+
   </script>
 </body>
 
