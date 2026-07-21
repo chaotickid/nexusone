@@ -1194,8 +1194,9 @@
         totalWeight += w;
 
         if (activeDirectionSelectionString === "Incoming") {
+          // Inside Incoming loop for PDF & CSV export
           const totalWaste = t + wa;
-          const fineVal = w * (totalWaste / 100);
+          const fineVal = Math.max(0, w - ((totalWaste / 100) * w))
           const rowLaborCost = Number(row.totalLaborCost) || 0;
 
           totalFine += fineVal;
@@ -1214,7 +1215,7 @@
             rowLaborCost.toFixed(2)
           ];
         } else {
-          const fineVal = w * (t / 100);
+          const fineVal = Math.max(0, w - ((t / 100) * w))
           totalFine += fineVal;
 
           return [
@@ -1291,7 +1292,8 @@
           const l = Number(row.labor) || 0;
 
           incWeight += w;
-          incFine += w * ((t + wa) / 100);
+          //incFine += w * ((100 - (t + wa)) / 100);
+          incFine += Math.max(0, w - (((t + wa) / 100) * w))
           incLabor += (l * w) / 1000;
         });
 
@@ -1910,8 +1912,11 @@
             if (endDateVal && rowTime > new Date(endDateVal).setHours(0, 0, 0, 0)) return;
           }
 
+          // Calculate Total Waste %
           const totalWaste = (Number(row.tunch) || 0) + (Number(row.waste) || 0);
-          const fineVal = (Number(row.weight) || 0) * (totalWaste / 100);
+
+          // Updated Fine calculation formula
+          const fineVal = Math.max(0, (Number(row.weight) || 0) - (((totalWaste / 100)) * (Number(row.weight) || 0)))
 
           // Filter 3: Incoming layout column specific threshold limits matching check
           if (chosenColumn !== 'none') {
@@ -1935,7 +1940,7 @@
           <input type="text" value="${itemVal}" oninput="updateGridTextCell(${i}, 'itemName', this.value)" class="static-cell-input input input-sm bg-transparent border-0 focus:bg-base-300 px-3 focus:outline-none text-white font-bold rounded-lg text-left" placeholder="Item description..." />
         </td>
         <td class="p-1 text-center">
-          <input type="date" value="${dateVal}" onchange="updateGridTextCell(${i}, 'date', this.value)" class="static-cell-input input input-sm bg-base-300/40 border border-white/5 focus:bg-base-300 text-center focus:outline-none text-primary font-bold rounded-lg px-2" />
+          <input type="date" value="${dateVal}" oninput="updateGridTextCell(${i}, 'date', this.value)" class="static-cell-input input input-sm bg-base-300/40 border border-white/5 focus:bg-base-300 text-center focus:outline-none text-primary font-bold rounded-lg px-2" />
         </td>
         <td class="p-1">
   <input type="text" 
@@ -2028,7 +2033,8 @@
           if (searchTunchNoQuery && !tunchNoVal.toLowerCase().includes(searchTunchNoQuery)) return;
 
           const tunchVal = Number(row.tunch) || 0;
-          const fineVal = (Number(row.weight) || 0) * (tunchVal / 100);
+
+          const fineVal = Math.max(0, (Number(row.weight) || 0) - (((row.tunch + row.waste) / 100) * (Number(row.weight) || 0)))
 
           // Filter 3: Outgoing Dropdown metric boundaries threshold check (Weight, Tunch, Fine options only)
           if (chosenOutgoingColumn !== 'none') {
@@ -2066,7 +2072,7 @@
         </td>
         <td id="calc-fine-${i}" class="font-bold text-success bg-base-900/10 font-mono text-center">${formatWeightDisplay(fineVal)}</td>
         <td class="p-1 text-center">
-          <input type="date" value="${dateVal}" onchange="updateGridTextCell(${i}, 'date', this.value)" class="static-cell-input input input-sm bg-base-300/40 border border-white/5 focus:bg-base-300 text-center focus:outline-none text-primary font-bold rounded-lg px-2" />
+          <input type="date" value="${dateVal}" oninput="updateGridTextCell(${i}, 'date', this.value)" class="static-cell-input input input-sm bg-base-300/40 border border-white/5 focus:bg-base-300 text-center focus:outline-none text-primary font-bold rounded-lg px-2" />
         </td>
         <td class="p-0 text-center no-print">
           <button onclick="removeMetricDataRow(${i})" class="btn btn-ghost btn-xs btn-square text-error/60 hover:text-error hover:bg-error/10 rounded-lg">
@@ -2115,9 +2121,10 @@
       currentGridRowsArray[index][property] = val;
     }
 
+
     function updateGridNumericCell(index, property, rawValue) {
       let numericValue = rawValue === '' ? 0 : Number(rawValue);
-      if (numericValue < 0) numericValue = 0;
+      if (isNaN(numericValue) || numericValue < 0) numericValue = 0;
 
       currentGridRowsArray[index][property] = numericValue;
 
@@ -2127,29 +2134,28 @@
 
       // Calculate row-specific values
       let fineCalculated = 0;
-      let totalLaborRowCost = 0; // Local variable
+      let totalLaborRowCost = (l * w) / 1000;
 
       if (activeDirectionSelectionString === "Incoming") {
         const wa = currentGridRowsArray[index].waste || 0;
         const totalWaste = t + wa;
-        fineCalculated = w * (totalWaste / 100);
 
-        // Calculate total cost for this specific row
-        totalLaborRowCost = (l * w) / 1000;
-
-        // CRITICAL: Save to the array so calculateMatrixColumnTotals() can see it
-        currentGridRowsArray[index].totalLaborCost = totalLaborRowCost;
+        fineCalculated = Math.max(0, w - w * (totalWaste / 100));
 
         const twEl = document.getElementById(`calc-totalwaste-${index}`);
         if (twEl) twEl.innerText = `${totalWaste.toFixed(2)}%`;
       } else {
-        fineCalculated = w * (t / 100);
+        fineCalculated = w - (w * (t / 100));
       }
 
-      // Update DOM for row
+      // Save to the array so calculateMatrixColumnTotals() can access it
+      currentGridRowsArray[index].totalLaborCost = totalLaborRowCost;
+
+      // Update DOM for row fine value
       const fEl = document.getElementById(`calc-fine-${index}`);
       if (fEl) fEl.innerText = formatWeightDisplay(fineCalculated);
 
+      // Update DOM for labor cost
       const tlEl = document.getElementById(`calc-total-labor-${index}`);
       if (tlEl) {
         tlEl.innerText = totalLaborRowCost.toFixed(2);
@@ -2158,7 +2164,7 @@
       calculateMatrixColumnTotals();
 
       // Trigger auto-add check to insert a new row if all details are filled
-      handleAutoAddRow(index);
+      //handleAutoAddRow(index);
     }
 
     function calculateMatrixColumnTotals() {
@@ -2188,7 +2194,9 @@
         const l = Number(row.labor) || 0;
 
         incTotalWeight += w;
-        const fineVal = w * ((t + wa) / 100);
+
+        const fineVal = Math.max(0, (Number(row.weight) || 0) - (((((Number(row.tunch) || 0) + (Number(row.waste) || 0)) / 100)) * (Number(row.weight) || 0)));
+
         const rowLaborCost = (l * w) / 1000;
 
         incTotalFine += fineVal;
@@ -2220,10 +2228,10 @@
 
         if (activeDirectionSelectionString === "Incoming") {
           const wa = Number(row.waste) || 0;
-          footerTotalFine += w * ((t + wa) / 100);
+          footerTotalFine += Math.max(0, w - (((t + wa) / 100) * w))
         } else {
           // Outgoing Fine calculation (Weight * Tunch / 100)
-          footerTotalFine += w * (t / 100);
+          footerTotalFine += w - (w * (t / 100));
         }
       });
 
@@ -2609,8 +2617,7 @@
 
         totalWeight += weight;
 
-        // Fine = weight * ((tunch + waste) / 100)
-        const fine = weight * ((tunch + waste) / 100);
+        const fine = Math.max(0, weight - (((tunch + waste) / 100) * weight))
         totalFine += fine;
 
         // Labor cost sum
@@ -2702,11 +2709,11 @@
 
       // If all fields in the last row are filled out, push a new blank row
       if (isRowComplete) {
-        if (activeDirectionSelectionString === "Incoming") {
-          currentGridRowsArray.push({ weight: "", tunch: "", waste: "", labor: "", totalLaborCost: 0 });
-        } else {
-          currentGridRowsArray.push({ weight: "", tunch: "" });
-        }
+        // if (activeDirectionSelectionString === "Incoming") {
+        //   currentGridRowsArray.push({ weight: "", tunch: "", waste: "", labor: "", totalLaborCost: 0 });
+        // } else {
+        //   currentGridRowsArray.push({ weight: "", tunch: "" });
+        // }
 
         // Re-render the grid UI so the new row appears immediately
         renderMetricsGridUI();
