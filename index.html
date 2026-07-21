@@ -1265,7 +1265,7 @@
       doc.text(`${party.firstName} ${party.lastName} - Report (${activeDirectionSelectionString})`, 103.5, 60);
 
       doc.setFontSize(18);
-      doc.text(`${party.firstName} ${party.lastName} - Report (${activeDirectionSelectionString})`, 14, 60);
+      doc.text(`${party.firstName} ${party.lastName} - Report (${activeDirectionSelectionString})`, 14, 60);/////
 
       const logoPngPath = path.join(userDataPath, 'logo.png');
       if (fs.existsSync(logoPngPath)) {
@@ -1276,7 +1276,7 @@
       }
 
       doc.setFontSize(10);
-      doc.text("Generated : " + new Date().toLocaleString(), 14, 67);
+      doc.text("Generated : " + new Date().toLocaleString(), 14, 67);////7
 
       // 5. Dynamic Table Start Y position
       let autoTableStartY = 72;
